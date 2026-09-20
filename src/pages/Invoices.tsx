@@ -7,13 +7,28 @@ import type { Invoice, Client, WorkEntry } from '../lib/types'
 
 const empty: Partial<Invoice> = { client_id: null, invoice_number: '', amount: 0, balance: 0, status: 'draft', issue_date: todayISO(), due_date: '', paid_date: null, notes: '' }
 
-const STATUS_PILL: Record<Invoice['status'], string> = { draft: 'neutral', sent: 'brand', paid: 'good', overdue: 'critical' }
 const ZOHO_ORG_ID = '879035148'
+
+// Zoho Invoice groups every invoice into three top-level categories — Draft, Unpaid, Paid —
+// with "sent" and "overdue" both falling under "Unpaid" (overdue just flags urgency via color).
+// This app tracks the finer-grained status locally (for the real Zoho sync), but categorizes
+// the same way Zoho itself does everywhere it's displayed here.
+type InvoiceCategory = 'draft' | 'unpaid' | 'paid'
+const CATEGORY_OF: Record<Invoice['status'], InvoiceCategory> = { draft: 'draft', sent: 'unpaid', overdue: 'unpaid', paid: 'paid' }
+const CATEGORY_LABEL: Record<InvoiceCategory, string> = { draft: 'Draft', unpaid: 'Unpaid', paid: 'Paid' }
+const CATEGORY_ORDER: InvoiceCategory[] = ['draft', 'unpaid', 'paid']
+function categoryPillClass(i: Invoice): string {
+  if (i.status === 'overdue') return 'critical'
+  if (i.status === 'paid') return 'good'
+  if (i.status === 'draft') return 'neutral'
+  return 'brand'
+}
 
 export default function Invoices() {
   const { invoices, clients, refresh, loading, workEntries } = useData()
   const [editing, setEditing] = useState<Partial<Invoice> | null>(null)
   const [saving, setSaving] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState<InvoiceCategory | 'all'>('all')
   const [newClientName, setNewClientName] = useState('')
   const [addingClient, setAddingClient] = useState(false)
   const [zohoSyncing, setZohoSyncing] = useState(false)
@@ -235,12 +250,16 @@ export default function Invoices() {
 
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name ?? '—'
 
+  const categoryCounts: Record<InvoiceCategory, number> = { draft: 0, unpaid: 0, paid: 0 }
+  invoices.forEach((i) => { categoryCounts[CATEGORY_OF[i.status]]++ })
+  const filteredInvoices = categoryFilter === 'all' ? invoices : invoices.filter((i) => CATEGORY_OF[i.status] === categoryFilter)
+
   return (
     <div>
       <div className="page-head">
         <div>
           <h2>Invoices</h2>
-          <div className="sub">Client invoices — draft, sent, paid, overdue</div>
+          <div className="sub">Client invoices — categorized as Draft, Unpaid and Paid, same as Zoho Invoice</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={syncAllWithZoho} disabled={zohoSyncing} title="Pushes every unlinked invoice to Zoho as a new invoice, and pulls the latest status/balance for invoices already linked — every save also does this automatically for that one invoice.">{zohoSyncing ? 'Syncing…' : 'Sync with Zoho'}</button>
@@ -262,17 +281,23 @@ export default function Invoices() {
 
       <section className="card" style={{ marginBottom: 16 }}>
         <div className="card-pad">
-          {loading ? <div className="empty">Loading…</div> : invoices.length === 0 ? (
-            <div className="empty">No invoices yet.</div>
+          <div className="tabs" style={{ marginBottom: 14 }}>
+            <button className={categoryFilter === 'all' ? 'active' : ''} onClick={() => setCategoryFilter('all')}>All &middot; {invoices.length}</button>
+            {CATEGORY_ORDER.map((c) => (
+              <button key={c} className={categoryFilter === c ? 'active' : ''} onClick={() => setCategoryFilter(c)}>{CATEGORY_LABEL[c]} &middot; {categoryCounts[c]}</button>
+            ))}
+          </div>
+          {loading ? <div className="empty">Loading…</div> : filteredInvoices.length === 0 ? (
+            <div className="empty">{invoices.length === 0 ? 'No invoices yet.' : `No ${CATEGORY_LABEL[categoryFilter as InvoiceCategory]?.toLowerCase() ?? ''} invoices.`}</div>
           ) : (
             <div className="table-scroll"><table>
               <thead><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th>Zoho</th><th></th></tr></thead>
               <tbody>
-                {invoices.map((i) => (
+                {filteredInvoices.map((i) => (
                   <tr key={i.id}>
                     <td>{i.invoice_number || i.id.slice(0, 8)}</td>
                     <td>{clientName(i.client_id)}</td>
-                    <td><span className={`pill ${STATUS_PILL[i.status]}`}>{i.status}</span></td>
+                    <td><span className={`pill ${categoryPillClass(i)}`}>{CATEGORY_LABEL[CATEGORY_OF[i.status]]}{i.status === 'overdue' ? ' · overdue' : ''}</span></td>
                     <td className="num">{fmtLKR(i.amount)}</td>
                     <td className="num" style={{ color: i.balance > 0 ? 'var(--critical)' : undefined }}>{fmtLKR(i.balance)}</td>
                     <td>{fmtDate(i.due_date)}</td>
