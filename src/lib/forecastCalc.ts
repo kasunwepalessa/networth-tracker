@@ -6,7 +6,7 @@ import {
   financialHealthScore, advanceRenewal, addMonths, monthsToPayoff as monthsToPayoffCalc, investmentValue,
 } from './calc'
 import { goalStatusInfo, requiredContribution as goalRequiredContribution, contributionPace as goalContributionPace } from './goalCalc'
-import { monthKey } from './format'
+import { monthKey, fmtDate } from './format'
 
 // ---------------------------------------------------------------------------
 // Period handling
@@ -573,9 +573,9 @@ export function buildForecastOverview(input: {
 
   let narrative = `In ${periodLabel}, your net worth is forecast to reach ${fmtNarrative(predictedNetWorth)}—${netWorthChange >= 0 ? 'an increase' : 'a decrease'} of ${fmtNarrative(Math.abs(netWorthChange))}.`
   if (cashFlow.negativeBalanceDate) {
-    narrative += ` Your cash balance is projected to go negative around ${cashFlow.negativeBalanceDate}.`
+    narrative += ` Your cash balance is projected to go negative around ${fmtDate(cashFlow.negativeBalanceDate)}.`
   } else if (cashFlow.lowBalanceDate) {
-    narrative += ` However, your cash balance may fall below ${fmtNarrative(cashFlow.lowBalanceThreshold)} around ${cashFlow.lowBalanceDate}.`
+    narrative += ` However, your cash balance may fall below ${fmtNarrative(cashFlow.lowBalanceThreshold)} around ${fmtDate(cashFlow.lowBalanceDate)}.`
   }
 
   return {
@@ -610,9 +610,9 @@ export function generateForecastInsights(input: {
   const out: ForecastInsight[] = []
 
   if (cashFlow.negativeBalanceDate) {
-    out.push({ kind: 'risk', text: `Your account is projected to go negative around ${cashFlow.negativeBalanceDate} at the current pace — build a buffer or trim spending before then.`, confidence: 'medium' })
+    out.push({ kind: 'risk', text: `Your account is projected to go negative around ${fmtDate(cashFlow.negativeBalanceDate)} at the current pace — build a buffer or trim spending before then.`, confidence: 'medium' })
   } else if (cashFlow.lowBalanceDate) {
-    out.push({ kind: 'watch', text: `Your account may fall below Rs ${cashFlow.lowBalanceThreshold.toLocaleString('en-LK')} around ${cashFlow.lowBalanceDate}.`, confidence: 'medium' })
+    out.push({ kind: 'watch', text: `Your account may fall below Rs ${cashFlow.lowBalanceThreshold.toLocaleString('en-LK')} around ${fmtDate(cashFlow.lowBalanceDate)}.`, confidence: 'medium' })
   }
 
   if (overview.expectedExpenses > overview.expectedIncome) {
