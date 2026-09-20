@@ -167,7 +167,11 @@ a { color: inherit; }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* Ending on "none" (rather than translateY(0), which is equivalent visually but not
+     equivalent to the CSS engine) means the element stops creating its own stacking
+     context once the animation settles — otherwise a popover inside it (e.g. the alerts
+     bell) gets trapped behind later same-level siblings like the KPI card rows below it. */
+  to { opacity: 1; transform: none; }
 }
 .rise { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .rise-1 { animation-delay: 0.02s; }

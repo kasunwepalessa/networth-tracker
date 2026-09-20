@@ -27,7 +27,9 @@ function readColorTheme(): ColorTheme {
 }
 function readMode(): Mode {
   const v = localStorage.getItem(MODE_KEY)
-  return v === 'light' || v === 'dark' ? v : 'system'
+  // Default to the light theme (matching the reference design) until the person explicitly
+  // picks Auto or Dark from the switcher — after that, their choice is remembered.
+  return v === 'light' || v === 'dark' || v === 'system' ? v : 'light'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
