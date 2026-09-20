@@ -3,11 +3,26 @@ import { useData } from '../lib/useData'
 import { transactionsApi } from '../lib/api'
 import Modal from '../components/Modal'
 import { fmtLKR, fmtDate, todayISO, OWNER_LABEL } from '../lib/format'
+import { periodRange, shiftPeriod, inRange, type PeriodType } from '../lib/calc'
 import type { Transaction, Owner } from '../lib/types'
 
 const empty: Partial<Transaction> = {
   txn_date: todayISO(), amount: 0, description: '', owner: 'personal',
   account_id: null, category_id: null, client_id: null, is_recurring: false, recurring_frequency: null,
+}
+
+const PERIOD_LABEL: Record<PeriodType, string> = {
+  all: 'All time', daily: 'Daily', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly', custom: 'Custom',
+}
+
+function periodTitle(type: PeriodType, anchor: Date, customStart: string, customEnd: string): string {
+  if (type === 'all') return 'All time'
+  if (type === 'daily') return anchor.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  if (type === 'monthly') return anchor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  if (type === 'quarterly') return `Q${Math.floor(anchor.getMonth() / 3) + 1} ${anchor.getFullYear()}`
+  if (type === 'yearly') return String(anchor.getFullYear())
+  if (customStart && customEnd) return `${fmtDate(customStart)} – ${fmtDate(customEnd)}`
+  return 'Pick a date range'
 }
 
 export default function Transactions() {
@@ -19,14 +34,29 @@ export default function Transactions() {
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [search, setSearch] = useState('')
 
+  const [periodType, setPeriodType] = useState<PeriodType>('all')
+  const [anchor, setAnchor] = useState(() => new Date())
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+
+  const range = useMemo(
+    () => periodRange(periodType, anchor, customStart, customEnd),
+    [periodType, anchor, customStart, customEnd],
+  )
+
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
       if (filterOwner !== 'all' && t.owner !== filterOwner) return false
       if (filterCategory !== 'all' && t.category_id !== filterCategory) return false
       if (search && !(t.description ?? '').toLowerCase().includes(search.toLowerCase())) return false
+      if (!inRange(t.txn_date, range)) return false
       return true
     })
-  }, [transactions, filterOwner, filterCategory, search])
+  }, [transactions, filterOwner, filterCategory, search, range])
+
+  const periodIncome = filtered.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const periodExpenses = Math.abs(filtered.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0))
+  const periodNet = periodIncome - periodExpenses
 
   function openNew() {
     setFlow('expense')
@@ -73,6 +103,49 @@ export default function Transactions() {
           <div className="sub">{transactions.length} recorded &middot; personal and business, split by owner</div>
         </div>
         <button className="btn primary" onClick={openNew}>+ Add transaction</button>
+      </div>
+
+      <div className="card card-pad" style={{ marginBottom: 14 }}>
+        <div className="tabs" style={{ marginBottom: 12 }}>
+          {(['all', 'daily', 'monthly', 'quarterly', 'yearly', 'custom'] as PeriodType[]).map((p) => (
+            <button key={p} className={periodType === p ? 'active' : ''} onClick={() => setPeriodType(p)}>{PERIOD_LABEL[p]}</button>
+          ))}
+        </div>
+        {periodType === 'custom' ? (
+          <div className="field-row" style={{ marginBottom: 0 }}>
+            <div className="field" style={{ maxWidth: 180 }}>
+              <label>From</label>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+            </div>
+            <div className="field" style={{ maxWidth: 180 }}>
+              <label>To</label>
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+            </div>
+          </div>
+        ) : periodType !== 'all' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
+            <button className="btn sm" onClick={() => setAnchor((a) => shiftPeriod(periodType, a, -1))} aria-label="Previous period">&larr;</button>
+            <span style={{ fontWeight: 700, fontSize: 13.5, minWidth: 140, textAlign: 'center' }}>{periodTitle(periodType, anchor, customStart, customEnd)}</span>
+            <button className="btn sm" onClick={() => setAnchor((a) => shiftPeriod(periodType, a, 1))} aria-label="Next period">&rarr;</button>
+            <button className="btn sm" onClick={() => setAnchor(new Date())}>Today</button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid cols-3" style={{ marginBottom: 14 }}>
+        <div className="card card-pad kpi">
+          <span className="label">Income {periodType !== 'all' ? `· ${periodTitle(periodType, anchor, customStart, customEnd)}` : ''}</span>
+          <span className="value num" style={{ color: 'var(--good)' }}>{fmtLKR(periodIncome)}</span>
+        </div>
+        <div className="card card-pad kpi">
+          <span className="label">Expenses {periodType !== 'all' ? `· ${periodTitle(periodType, anchor, customStart, customEnd)}` : ''}</span>
+          <span className="value num" style={{ color: 'var(--critical)' }}>{fmtLKR(periodExpenses)}</span>
+        </div>
+        <div className="card card-pad kpi">
+          <span className="label">Net</span>
+          <span className="value num" style={{ color: periodNet >= 0 ? 'var(--good)' : 'var(--critical)' }}>{fmtLKR(periodNet, { sign: true })}</span>
+          <span className="sub">{filtered.length} transaction{filtered.length === 1 ? '' : 's'}</span>
+        </div>
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>

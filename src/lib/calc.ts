@@ -175,6 +175,57 @@ export function monthTransactions(transactions: Transaction[], month: string, ow
   return transactions.filter((t) => monthKey(t.txn_date) === month && (!owner || t.owner === owner))
 }
 
+export type PeriodType = 'all' | 'daily' | 'monthly' | 'quarterly' | 'yearly' | 'custom'
+
+export interface PeriodRange {
+  start: string // ISO yyyy-mm-dd, inclusive
+  end: string // ISO yyyy-mm-dd, inclusive
+}
+
+function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** The inclusive date range for a period type anchored on a given date. Returns null for 'all' (no filter),
+ *  and for 'custom' when either bound is missing. */
+export function periodRange(type: PeriodType, anchor: Date, customStart?: string, customEnd?: string): PeriodRange | null {
+  if (type === 'all') return null
+  if (type === 'custom') {
+    if (!customStart || !customEnd) return null
+    return customStart <= customEnd ? { start: customStart, end: customEnd } : { start: customEnd, end: customStart }
+  }
+  const y = anchor.getFullYear()
+  const m = anchor.getMonth()
+  if (type === 'daily') {
+    const iso = toISODate(anchor)
+    return { start: iso, end: iso }
+  }
+  if (type === 'monthly') {
+    return { start: toISODate(new Date(y, m, 1)), end: toISODate(new Date(y, m + 1, 0)) }
+  }
+  if (type === 'quarterly') {
+    const q = Math.floor(m / 3)
+    return { start: toISODate(new Date(y, q * 3, 1)), end: toISODate(new Date(y, q * 3 + 3, 0)) }
+  }
+  // yearly
+  return { start: toISODate(new Date(y, 0, 1)), end: toISODate(new Date(y, 11, 31)) }
+}
+
+/** Moves the anchor date one step forward (dir=1) or back (dir=-1) for the given period type. */
+export function shiftPeriod(type: PeriodType, anchor: Date, dir: 1 | -1): Date {
+  const d = new Date(anchor)
+  if (type === 'daily') d.setDate(d.getDate() + dir)
+  else if (type === 'monthly') d.setMonth(d.getMonth() + dir)
+  else if (type === 'quarterly') d.setMonth(d.getMonth() + dir * 3)
+  else if (type === 'yearly') d.setFullYear(d.getFullYear() + dir)
+  return d
+}
+
+export function inRange(dateISO: string, range: PeriodRange | null): boolean {
+  if (!range) return true
+  return dateISO >= range.start && dateISO <= range.end
+}
+
 export function sumIncome(txns: Transaction[]): number {
   return txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
 }
