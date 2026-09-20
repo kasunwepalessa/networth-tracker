@@ -157,6 +157,23 @@ export interface Goal {
   created_at: string
 }
 
+export interface WorkEntry {
+  id: string
+  client_id: string | null
+  work_date: string
+  month: string
+  description: string
+  quantity: number
+  rate: number
+  amount: number
+  status: 'pending' | 'pushed'
+  zoho_invoice_id: string | null
+  zoho_invoice_number: string | null
+  pushed_at: string | null
+  notes: string | null
+  created_at: string
+}
+
 export interface NetworthSnapshot {
   snapshot_date: string
   total_assets: number

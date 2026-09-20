@@ -2,11 +2,11 @@ import { createContext, useContext, useCallback, useEffect, useState, type React
 import {
   accountsApi, categoriesApi, clientsApi, listTransactions, assetsApi,
   investmentsApi, fixedDepositsApi, liabilitiesApi, invoicesApi, budgetsApi,
-  goalsApi, listSnapshots,
+  goalsApi, listSnapshots, workEntriesApi,
 } from './api'
 import type {
   Account, Category, Client, Transaction, Asset, Investment, FixedDeposit,
-  Liability, Invoice, Budget, Goal, NetworthSnapshot,
+  Liability, Invoice, Budget, Goal, NetworthSnapshot, WorkEntry,
 } from './types'
 import { useAuth } from './useAuth'
 
@@ -23,6 +23,7 @@ interface DataState {
   budgets: Budget[]
   goals: Goal[]
   snapshots: NetworthSnapshot[]
+  workEntries: WorkEntry[]
   loading: boolean
   refresh: (key?: DataKey) => Promise<void>
 }
@@ -30,7 +31,7 @@ interface DataState {
 type DataKey =
   | 'accounts' | 'categories' | 'clients' | 'transactions' | 'assets'
   | 'investments' | 'fixedDeposits' | 'liabilities' | 'invoices' | 'budgets'
-  | 'goals' | 'snapshots'
+  | 'goals' | 'snapshots' | 'workEntries'
 
 const DataContext = createContext<DataState | null>(null)
 
@@ -47,6 +48,7 @@ const loaders: Record<DataKey, () => Promise<unknown>> = {
   budgets: () => budgetsApi.list('month', false),
   goals: () => goalsApi.list('target_date', true),
   snapshots: () => listSnapshots(),
+  workEntries: () => workEntriesApi.list('created_at', false),
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -54,7 +56,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Omit<DataState, 'refresh'>>({
     accounts: [], categories: [], clients: [], transactions: [], assets: [],
     investments: [], fixedDeposits: [], liabilities: [], invoices: [],
-    budgets: [], goals: [], snapshots: [], loading: true,
+    budgets: [], goals: [], snapshots: [], workEntries: [], loading: true,
   })
 
   const refresh = useCallback(async (key?: DataKey) => {

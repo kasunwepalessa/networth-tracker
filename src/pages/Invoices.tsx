@@ -1,20 +1,34 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/useData'
-import { invoicesApi, clientsApi } from '../lib/api'
+import { invoicesApi, clientsApi, workEntriesApi, zohoApi } from '../lib/api'
 import Modal from '../components/Modal'
-import { fmtLKR, fmtDate, todayISO } from '../lib/format'
-import type { Invoice } from '../lib/types'
+import { fmtLKR, fmtDate, todayISO, monthKey, fmtMonthShort } from '../lib/format'
+import type { Invoice, Client, WorkEntry } from '../lib/types'
 
 const empty: Partial<Invoice> = { client_id: null, invoice_number: '', amount: 0, balance: 0, status: 'draft', issue_date: todayISO(), due_date: '', paid_date: null, notes: '' }
 
 const STATUS_PILL: Record<Invoice['status'], string> = { draft: 'neutral', sent: 'brand', paid: 'good', overdue: 'critical' }
+const ZOHO_ORG_ID = '879035148'
 
 export default function Invoices() {
-  const { invoices, clients, refresh, loading } = useData()
+  const { invoices, clients, refresh, loading, workEntries } = useData()
   const [editing, setEditing] = useState<Partial<Invoice> | null>(null)
   const [saving, setSaving] = useState(false)
   const [newClientName, setNewClientName] = useState('')
   const [addingClient, setAddingClient] = useState(false)
+
+  // --- work log / Zoho state ---
+  const [syncing, setSyncing] = useState(false)
+  const [workClientId, setWorkClientId] = useState('')
+  const [workMonth, setWorkMonth] = useState(monthKey())
+  const [workDesc, setWorkDesc] = useState('')
+  const [workQty, setWorkQty] = useState(1)
+  const [workRate, setWorkRate] = useState(0)
+  const [addingWork, setAddingWork] = useState(false)
+  const [pushingKey, setPushingKey] = useState<string | null>(null)
+  const [newCustName, setNewCustName] = useState('')
+  const [newCustEmail, setNewCustEmail] = useState('')
+  const [addingCustomer, setAddingCustomer] = useState(false)
 
   async function save() {
     if (!editing) return
@@ -32,16 +46,121 @@ export default function Invoices() {
     await invoicesApi.remove(id)
     await refresh('invoices')
   }
+
+  // Creates a client locally, then creates the matching contact in Zoho and links the two.
+  // If the Zoho half fails, the local client still exists — it can be synced later.
+  async function createClientSynced(name: string, email?: string): Promise<Client> {
+    const c = await clientsApi.create({ name })
+    try {
+      await zohoApi.createCustomer(name, email || undefined, c.id)
+    } catch (e) {
+      alert(`"${name}" was added, but syncing it to Zoho failed: ${(e as Error).message}\nYou can retry with "Sync customers from Zoho" once fixed.`)
+    }
+    await refresh('clients')
+    return c
+  }
+
   async function addClient() {
     if (!newClientName.trim()) return
     setAddingClient(true)
     try {
-      const c = await clientsApi.create({ name: newClientName.trim() })
-      await refresh('clients')
+      const c = await createClientSynced(newClientName.trim())
       setEditing((e) => e ? { ...e, client_id: c.id } : e)
       setNewClientName('')
     } finally { setAddingClient(false) }
   }
+
+  async function addCustomerFromWorkLog() {
+    if (!newCustName.trim()) return
+    setAddingCustomer(true)
+    try {
+      const c = await createClientSynced(newCustName.trim(), newCustEmail.trim())
+      setWorkClientId(c.id)
+      setNewCustName('')
+      setNewCustEmail('')
+    } finally { setAddingCustomer(false) }
+  }
+
+  async function syncFromZoho() {
+    setSyncing(true)
+    try {
+      const contacts = await zohoApi.listCustomers()
+      const linkedIds = new Set(clients.filter((c) => c.zoho_contact_id).map((c) => c.zoho_contact_id))
+      const byName = new Map(clients.filter((c) => !c.zoho_contact_id).map((c) => [c.name.trim().toLowerCase(), c]))
+      for (const contact of contacts) {
+        if (linkedIds.has(contact.zoho_contact_id)) continue
+        const match = byName.get(contact.name.trim().toLowerCase())
+        if (match) await clientsApi.update(match.id, { zoho_contact_id: contact.zoho_contact_id })
+        else await clientsApi.create({ name: contact.name, zoho_contact_id: contact.zoho_contact_id })
+      }
+      await refresh('clients')
+    } catch (e) {
+      alert(`Sync from Zoho failed: ${(e as Error).message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  async function addWorkEntry() {
+    if (!workClientId || !workDesc.trim() || workQty <= 0) return
+    setAddingWork(true)
+    try {
+      await workEntriesApi.create({
+        client_id: workClientId, work_date: todayISO(), month: workMonth,
+        description: workDesc.trim(), quantity: workQty, rate: workRate, status: 'pending',
+      })
+      await refresh('workEntries')
+      setWorkDesc('')
+      setWorkQty(1)
+      setWorkRate(0)
+    } finally { setAddingWork(false) }
+  }
+
+  async function removeWorkEntry(id: string) {
+    await workEntriesApi.remove(id)
+    await refresh('workEntries')
+  }
+
+  async function pushGroup(clientId: string, month: string, entryIds: string[]) {
+    const client = clients.find((c) => c.id === clientId)
+    if (!client?.zoho_contact_id) { alert('This customer isn\'t linked to Zoho yet — use "Sync customers from Zoho" or add them as a new customer here first.'); return }
+    const key = `${clientId}:${month}`
+    setPushingKey(key)
+    try {
+      const res = await zohoApi.pushWork(client.zoho_contact_id, month, entryIds)
+      await refresh('workEntries')
+      alert(`Pushed to Zoho as draft invoice ${res.zoho_invoice_number}. Review and send it from Zoho when ready.`)
+    } catch (e) {
+      alert(`Push to Zoho failed: ${(e as Error).message}`)
+    } finally {
+      setPushingKey(null)
+    }
+  }
+
+  const pendingGroups = useMemo(() => {
+    const map = new Map<string, { clientId: string; month: string; entries: WorkEntry[] }>()
+    workEntries.filter((w) => w.status === 'pending' && w.client_id).forEach((w) => {
+      const key = `${w.client_id}:${w.month}`
+      if (!map.has(key)) map.set(key, { clientId: w.client_id!, month: w.month, entries: [] })
+      map.get(key)!.entries.push(w)
+    })
+    return Array.from(map.values())
+      .map((g) => ({
+        ...g,
+        key: `${g.clientId}:${g.month}`,
+        clientName: clients.find((c) => c.id === g.clientId)?.name ?? 'Unknown customer',
+        zohoContactId: clients.find((c) => c.id === g.clientId)?.zoho_contact_id ?? null,
+        total: g.entries.reduce((s, e) => s + e.amount, 0),
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month))
+  }, [workEntries, clients])
+
+  const recentlyPushed = useMemo(
+    () => workEntries.filter((w) => w.status === 'pushed').sort((a, b) => (b.pushed_at ?? '').localeCompare(a.pushed_at ?? '')).slice(0, 8),
+    [workEntries],
+  )
+
+  const linkedCount = clients.filter((c) => c.zoho_contact_id).length
 
   const outstanding = invoices.filter((i) => i.status === 'sent' || i.status === 'overdue').reduce((s, i) => s + i.balance, 0)
   const overdue = invoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.balance, 0)
@@ -103,6 +222,102 @@ export default function Invoices() {
                 ))}
               </tbody>
             </table></div>
+          )}
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 16 }}>
+        <div className="card-pad">
+          <div className="section-head">
+            <h3>Work log &middot; push to Zoho</h3>
+            <button className="btn sm" onClick={syncFromZoho} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync customers from Zoho'}</button>
+          </div>
+          <div className="sub" style={{ marginBottom: 14 }}>
+            Log billable work for a customer and month, then push it as a draft invoice in Zoho — review and send it from there.
+            {' '}{linkedCount} of {clients.length} customers are linked to Zoho.
+          </div>
+
+          <div className="field-row" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
+            <div className="field" style={{ minWidth: 170 }}>
+              <label>Customer</label>
+              <select value={workClientId} onChange={(e) => setWorkClientId(e.target.value)}>
+                <option value="">Select…</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.zoho_contact_id ? '' : ' (not synced)'}</option>)}
+              </select>
+            </div>
+            <div className="field" style={{ maxWidth: 150 }}>
+              <label>Month</label>
+              <input type="month" value={workMonth} onChange={(e) => setWorkMonth(e.target.value)} />
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 200 }}>
+              <label>Description</label>
+              <input value={workDesc} onChange={(e) => setWorkDesc(e.target.value)} placeholder="e.g. Social media content — week 3" />
+            </div>
+            <div className="field" style={{ maxWidth: 90 }}>
+              <label>Qty</label>
+              <input type="number" min={0} value={workQty} onChange={(e) => setWorkQty(Number(e.target.value))} />
+            </div>
+            <div className="field" style={{ maxWidth: 150 }}>
+              <label>Rate (Rs)</label>
+              <input type="number" min={0} value={workRate} onChange={(e) => setWorkRate(Number(e.target.value))} />
+            </div>
+            <button className="btn primary" onClick={addWorkEntry} disabled={addingWork || !workClientId || !workDesc.trim()}>+ Add</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+            <input value={newCustName} onChange={(e) => setNewCustName(e.target.value)} placeholder="New customer name…" style={{ flex: 1, maxWidth: 220 }} />
+            <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email (optional)" style={{ flex: 1, maxWidth: 220 }} />
+            <button className="btn sm" type="button" onClick={addCustomerFromWorkLog} disabled={addingCustomer || !newCustName.trim()}>Add customer (syncs to Zoho)</button>
+          </div>
+
+          {pendingGroups.length === 0 ? (
+            <div className="empty">No pending work entries yet — add one above.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pendingGroups.map((g) => (
+                <div key={g.key} className="card" style={{ background: 'var(--surface-2)' }}>
+                  <div className="card-pad">
+                    <div className="section-head">
+                      <h3 style={{ fontSize: 13 }}>{g.clientName} &middot; {fmtMonthShort(g.month)} {g.month.slice(0, 4)}</h3>
+                      <button className="btn sm primary" onClick={() => pushGroup(g.clientId, g.month, g.entries.map((e) => e.id))} disabled={pushingKey === g.key}>
+                        {pushingKey === g.key ? 'Pushing…' : `Push ${g.entries.length} to Zoho`}
+                      </button>
+                    </div>
+                    {!g.zohoContactId && <div className="alert warning" style={{ marginBottom: 10 }}>Not linked to Zoho — sync or re-add this customer before pushing.</div>}
+                    <div className="table-scroll"><table>
+                      <thead><tr><th>Description</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th><th></th></tr></thead>
+                      <tbody>
+                        {g.entries.map((e) => (
+                          <tr key={e.id}>
+                            <td>{e.description}</td>
+                            <td className="num">{e.quantity}</td>
+                            <td className="num">{fmtLKR(e.rate)}</td>
+                            <td className="num">{fmtLKR(e.amount)}</td>
+                            <td style={{ textAlign: 'right' }}><button className="btn sm danger" onClick={() => removeWorkEntry(e.id)}>Remove</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+                    <div style={{ textAlign: 'right', fontWeight: 700, marginTop: 8 }}>Total {fmtLKR(g.total)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {recentlyPushed.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <div className="section-head"><h3 style={{ fontSize: 13 }}>Recently pushed</h3></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {recentlyPushed.map((e) => (
+                  <div key={e.id} className="sub" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{e.description} &middot; {clientName(e.client_id)}</span>
+                    <a href={`https://invoice.zoho.com/app/${ZOHO_ORG_ID}#/invoices/${e.zoho_invoice_id}`} target="_blank" rel="noreferrer">
+                      Draft {e.zoho_invoice_number} &rarr;
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </section>
