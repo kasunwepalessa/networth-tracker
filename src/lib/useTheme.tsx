@@ -20,21 +20,28 @@ const ThemeContext = createContext<ThemeState | null>(null)
 
 const CT_KEY = 'nw-color-theme'
 const MODE_KEY = 'nw-mode'
+// Tracks whether the person has ever actually used the switcher, as opposed to just having
+// a value auto-persisted for them (e.g. by an earlier build that defaulted to "system" and
+// wrote that to storage on every load). Only an explicit choice should survive a refresh —
+// everyone else should keep seeing the light default, even on a browser that visited before.
+const EXPLICIT_KEY = 'nw-mode-explicit'
 
 function readColorTheme(): ColorTheme {
   const v = localStorage.getItem(CT_KEY)
   return v === 'indigo' || v === 'sunset' || v === 'quixotic' ? v : 'quixotic'
 }
 function readMode(): Mode {
+  const explicit = localStorage.getItem(EXPLICIT_KEY) === '1'
   const v = localStorage.getItem(MODE_KEY)
+  if (explicit && (v === 'light' || v === 'dark' || v === 'system')) return v
   // Default to the light theme (matching the reference design) until the person explicitly
   // picks Auto or Dark from the switcher — after that, their choice is remembered.
-  return v === 'light' || v === 'dark' || v === 'system' ? v : 'light'
+  return 'light'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [colorTheme, setColorTheme] = useState<ColorTheme>(readColorTheme)
-  const [mode, setMode] = useState<Mode>(readMode)
+  const [mode, setModeState] = useState<Mode>(readMode)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-color-theme', colorTheme)
@@ -46,6 +53,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     else document.documentElement.setAttribute('data-theme', mode)
     try { localStorage.setItem(MODE_KEY, mode) } catch { /* ignore */ }
   }, [mode])
+
+  // Only a real switcher interaction marks the choice as explicit — the initial mount (which
+  // just applies whatever readMode() returned) never touches this flag.
+  const setMode = (m: Mode) => {
+    setModeState(m)
+    try { localStorage.setItem(EXPLICIT_KEY, '1') } catch { /* ignore */ }
+  }
 
   return (
     <ThemeContext.Provider value={{ colorTheme, mode, setColorTheme, setMode }}>
