@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLOR_THEMES, useTheme, type Mode } from '../lib/useTheme'
 
-export default function ThemeSwitcher() {
+export default function ThemeSwitcher({ placement = 'down' }: { placement?: 'up' | 'down' }) {
   const { colorTheme, setColorTheme, mode, setMode } = useTheme()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -27,7 +27,7 @@ export default function ThemeSwitcher() {
         </svg>
       </button>
       {open && (
-        <div className="theme-pop">
+        <div className={`theme-pop${placement === 'up' ? ' theme-pop-up' : ''}`}>
           <p className="theme-pop-label">Color theme</p>
           <div className="theme-swatch-row">
             {COLOR_THEMES.map((t) => (

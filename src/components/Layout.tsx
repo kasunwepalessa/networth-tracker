@@ -35,7 +35,7 @@ export default function Layout() {
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0 4px' }}>
           <button className="signout" style={{ flex: 1 }} onClick={() => signOut()}>Sign out</button>
-          <ThemeSwitcher />
+          <ThemeSwitcher placement="up" />
         </div>
       </aside>
 
