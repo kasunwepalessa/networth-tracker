@@ -1,5 +1,5 @@
 import type {
-  Account, Asset, Investment, FixedDeposit, Liability, Transaction, Invoice, Owner,
+  Account, Asset, Investment, FixedDeposit, Liability, Transaction, Invoice, Owner, Category,
 } from './types'
 import { monthKey } from './format'
 
@@ -235,4 +235,48 @@ export function financialHealthScore(input: {
   score = Math.max(0, Math.min(100, Math.round(score)))
   const label = score >= 80 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : score >= 25 ? 'Needs attention' : 'At risk'
   return { score, label }
+}
+
+export interface MonthlyFlow {
+  month: string
+  income: number
+  expenses: number
+}
+
+/** Income vs. expense totals for each of the last `months` calendar months, oldest first. */
+export function monthlyFlowSeries(transactions: Transaction[], months: number, owner?: Owner): MonthlyFlow[] {
+  const out: MonthlyFlow[] = []
+  const now = new Date()
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = monthKey(d)
+    const txns = monthTransactions(transactions, key, owner)
+    out.push({ month: key, income: sumIncome(txns), expenses: sumExpenses(txns) })
+  }
+  return out
+}
+
+export interface CategorySlice {
+  name: string
+  amount: number
+}
+
+/** Expense total per category for one month, sorted descending, folded to "Other" past `topN`. */
+export function expenseByCategory(
+  transactions: Transaction[], categories: Category[], month: string, owner?: Owner, topN = 6,
+): CategorySlice[] {
+  const txns = monthTransactions(transactions, month, owner).filter((t) => t.amount < 0)
+  const byCat = new Map<string, number>()
+  txns.forEach((t) => {
+    const cat = categories.find((c) => c.id === t.category_id)
+    const name = cat?.name ?? 'Uncategorized'
+    byCat.set(name, (byCat.get(name) ?? 0) + Math.abs(t.amount))
+  })
+  const sorted = Array.from(byCat.entries())
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+  if (sorted.length <= topN) return sorted
+  const head = sorted.slice(0, topN)
+  const rest = sorted.slice(topN).reduce((s, c) => s + c.amount, 0)
+  return rest > 0 ? [...head, { name: 'Other', amount: rest }] : head
 }

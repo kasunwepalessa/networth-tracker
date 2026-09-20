@@ -35,6 +35,11 @@ export function monthKey(d: string | Date = new Date()): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
 }
 
+export function fmtMonthShort(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short' })
+}
+
 export function daysUntil(d: string | null | undefined): number | null {
   if (!d) return null
   const target = new Date(d + 'T00:00:00')
