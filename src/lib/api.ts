@@ -46,8 +46,11 @@ export const workEntriesApi = table<WorkEntry>('nw_work_entries')
 export const subscriptionsApi = table<Subscription>('nw_subscriptions')
 
 /** Logs this cycle's payment for a subscription as a real transaction, and rolls the
- *  subscription's next_renewal_date forward to the following cycle. */
-export async function logSubscriptionPayment(sub: Subscription): Promise<void> {
+ *  subscription's next_renewal_date forward to the following cycle. If the subscription's
+ *  category is already linked to a Zoho expense category, the payment is also mirrored into
+ *  Zoho Invoice as an Expense — best-effort: a Zoho failure doesn't undo the local log, it's
+ *  just reported back so the caller can surface it. */
+export async function logSubscriptionPayment(sub: Subscription): Promise<{ zohoSynced: boolean; zohoError?: string; zohoSkippedReason?: string }> {
   const payload: Partial<Transaction> = {
     txn_date: sub.next_renewal_date,
     amount: -Math.abs(sub.amount),
@@ -61,8 +64,19 @@ export async function logSubscriptionPayment(sub: Subscription): Promise<void> {
     recurring_frequency: sub.billing_cycle === 'quarterly' ? 'monthly' : sub.billing_cycle,
     source: 'subscription',
   }
-  await transactionsApi.create(payload)
+  const txn = await transactionsApi.create(payload)
   await subscriptionsApi.update(sub.id, { next_renewal_date: advanceRenewal(sub.next_renewal_date, sub.billing_cycle) })
+
+  if (!sub.category_id) return { zohoSynced: false, zohoSkippedReason: 'no category set on this subscription' }
+  const category = await categoriesApi.list().then((cats) => cats.find((c) => c.id === sub.category_id))
+  if (!category?.zoho_account_id) return { zohoSynced: false, zohoSkippedReason: `"${category?.name ?? 'this'}" category isn't linked to Zoho yet` }
+
+  try {
+    await zohoApi.pushExpense(txn.id)
+    return { zohoSynced: true }
+  } catch (e) {
+    return { zohoSynced: false, zohoError: (e as Error).message }
+  }
 }
 
 export async function listTransactions(orderBy = 'txn_date', ascending = false): Promise<Transaction[]> {
@@ -123,5 +137,21 @@ export const zohoApi = {
   async pushWork(zohoContactId: string, month: string, entryIds: string[]): Promise<{ zoho_invoice_id: string; zoho_invoice_number: string }> {
     const r = await callZoho({ action: 'push_work', zoho_contact_id: zohoContactId, month, entry_ids: entryIds })
     return { zoho_invoice_id: r.zoho_invoice_id as string, zoho_invoice_number: r.zoho_invoice_number as string }
+  },
+  async listExpenseCategories(): Promise<{ account_id: string; account_name: string }[]> {
+    const r = await callZoho({ action: 'list_expense_categories' })
+    return (r.categories ?? []) as { account_id: string; account_name: string }[]
+  },
+  // Finds (or creates) a Zoho expense category matching `name` and links it to the local
+  // category row, so future pushes for that category know which Zoho account to file under.
+  async ensureExpenseCategory(localCategoryId: string, name: string): Promise<{ zoho_account_id: string; zoho_account_name: string }> {
+    const r = await callZoho({ action: 'ensure_expense_category', local_category_id: localCategoryId, name })
+    return { zoho_account_id: r.zoho_account_id as string, zoho_account_name: r.zoho_account_name as string }
+  },
+  // Pushes one already-recorded expense transaction into Zoho Invoice as an Expense.
+  // Idempotent — safe to call again for a transaction that was already pushed.
+  async pushExpense(transactionId: string): Promise<{ zoho_expense_id: string; already_synced?: boolean }> {
+    const r = await callZoho({ action: 'push_expense', transaction_id: transactionId })
+    return { zoho_expense_id: r.zoho_expense_id as string, already_synced: r.already_synced as boolean | undefined }
   },
 }

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/useData'
-import { subscriptionsApi, logSubscriptionPayment } from '../lib/api'
+import { subscriptionsApi, logSubscriptionPayment, zohoApi } from '../lib/api'
 import { totalMonthlySubscriptionCost, totalYearlySubscriptionCost, upcomingSubscriptions, subscriptionMonthlyCost } from '../lib/calc'
 import { fmtLKR, fmtDate, todayISO, daysUntil, OWNER_LABEL } from '../lib/format'
 import { useCountUp } from '../lib/useCountUp'
 import Modal from '../components/Modal'
-import type { Subscription, Owner, BillingCycle } from '../lib/types'
+import type { Subscription, Owner, BillingCycle, Category } from '../lib/types'
 
 const CYCLE_LABEL: Record<BillingCycle, string> = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }
 const AVATAR_COLORS = ['var(--brand)', 'var(--accent)', 'var(--cat-1)', 'var(--cat-5)', 'var(--cat-7)', 'var(--cat-2)']
@@ -44,6 +44,7 @@ export default function Subscriptions() {
   const [saving, setSaving] = useState(false)
   const [loggingId, setLoggingId] = useState<string | null>(null)
   const [showCancelled, setShowCancelled] = useState(false)
+  const [connectingCatId, setConnectingCatId] = useState<string | null>(null)
 
   const monthlyCost = totalMonthlySubscriptionCost(subscriptions)
   const yearlyCost = totalYearlySubscriptionCost(subscriptions)
@@ -89,11 +90,32 @@ export default function Subscriptions() {
   async function logPayment(s: Subscription) {
     setLoggingId(s.id)
     try {
-      await logSubscriptionPayment(s)
+      const result = await logSubscriptionPayment(s)
       await refresh('subscriptions')
       await refresh('transactions')
+      if (result.zohoError) alert(`Logged locally, but syncing to Zoho failed: ${result.zohoError}`)
     } finally {
       setLoggingId(null)
+    }
+  }
+
+  // Subscription categories not yet linked to a Zoho expense category — surfaced so the
+  // person can connect them once, after which every future "Log payment" for a subscription
+  // in that category is mirrored into Zoho Invoice's Expenses automatically.
+  const unlinkedSubCategories = useMemo(() => {
+    const usedIds = new Set(subscriptions.map((s) => s.category_id).filter((id): id is string => !!id))
+    return categories.filter((c) => usedIds.has(c.id) && !c.zoho_account_id)
+  }, [subscriptions, categories])
+
+  async function connectCategoryToZoho(cat: Category) {
+    setConnectingCatId(cat.id)
+    try {
+      await zohoApi.ensureExpenseCategory(cat.id, cat.name)
+      await refresh('categories')
+    } catch (e) {
+      alert(`Couldn't link "${cat.name}" to Zoho: ${(e as Error).message}`)
+    } finally {
+      setConnectingCatId(null)
     }
   }
 
@@ -108,6 +130,22 @@ export default function Subscriptions() {
         </div>
         <button className="btn primary pill" onClick={openNew}>+ Add subscription</button>
       </div>
+
+      {unlinkedSubCategories.length > 0 && (
+        <div className="alert warning rise" style={{ marginBottom: 14, alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>
+            {unlinkedSubCategories.map((c) => `"${c.name}"`).join(', ')} {unlinkedSubCategories.length === 1 ? 'isn\'t' : 'aren\'t'} linked to Zoho Invoice yet —
+            connect it once and every "Log payment" from a subscription in that category will sync to Zoho Invoice as an expense automatically.
+          </span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 'none' }}>
+            {unlinkedSubCategories.map((c) => (
+              <button key={c.id} className="btn sm pill" disabled={connectingCatId === c.id} onClick={() => connectCategoryToZoho(c)}>
+                {connectingCatId === c.id ? 'Connecting…' : `Connect "${c.name}"`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid cols-3 rise rise-1" style={{ marginBottom: 14 }}>
         <div className="card card-pad kpi">

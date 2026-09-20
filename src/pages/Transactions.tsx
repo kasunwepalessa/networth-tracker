@@ -139,7 +139,11 @@ export default function Transactions() {
                   {filtered.map((t) => (
                     <tr key={t.id}>
                       <td className="num">{fmtDate(t.txn_date)}</td>
-                      <td>{t.description || '—'}{clientName(t.client_id) ? <div className="sub" style={{ fontSize: 11 }}>{clientName(t.client_id)}</div> : null}</td>
+                      <td>
+                        {t.description || '—'}
+                        {clientName(t.client_id) ? <div className="sub" style={{ fontSize: 11 }}>{clientName(t.client_id)}</div> : null}
+                        {t.zoho_expense_id ? <div style={{ marginTop: 4 }}><span className="pill good" title={`Synced to Zoho Invoice on ${fmtDate(t.zoho_pushed_at)}`}>Synced to Zoho</span></div> : null}
+                      </td>
                       <td>{catName(t.category_id)}</td>
                       <td>{accName(t.account_id)}</td>
                       <td><span className={`pill ${t.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[t.owner]}</span></td>

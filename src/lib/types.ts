@@ -18,6 +18,8 @@ export interface Category {
   name: string
   kind: 'income' | 'expense'
   owner_scope: Owner | 'both'
+  zoho_account_id: string | null
+  zoho_account_name: string | null
   created_at: string
 }
 
@@ -42,6 +44,8 @@ export interface Transaction {
   is_recurring: boolean
   recurring_frequency: 'weekly' | 'monthly' | 'yearly' | null
   source: string
+  zoho_expense_id: string | null
+  zoho_pushed_at: string | null
   created_at: string
 }
 
