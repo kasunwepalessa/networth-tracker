@@ -19,6 +19,25 @@ function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
+// Groups the upcoming-renewals list by urgency so the most time-sensitive items are
+// scannable at a glance, instead of one long undifferentiated list.
+const UPCOMING_SECTIONS: { key: string; label: string; test: (days: number) => boolean }[] = [
+  { key: 'week', label: 'Due this week', test: (d) => d <= 7 },
+  { key: 'fortnight', label: 'Next 2 weeks', test: (d) => d > 7 && d <= 14 },
+  { key: 'later', label: 'Later this month', test: (d) => d > 14 },
+]
+
+function urgencyLabel(days: number): string {
+  if (days <= 0) return 'Due today'
+  if (days === 1) return 'Due tomorrow'
+  return `Due in ${days} days`
+}
+function urgencyPillClass(days: number): string {
+  if (days <= 2) return 'critical'
+  if (days <= 7) return 'warning'
+  return 'neutral'
+}
+
 export default function Subscriptions() {
   const { subscriptions, categories, accounts, loading, refresh } = useData()
   const [editing, setEditing] = useState<Partial<Subscription> | null>(null)
@@ -111,28 +130,48 @@ export default function Subscriptions() {
       {upcoming.length > 0 && (
         <section className="card hoverable rise rise-2" style={{ marginBottom: 14 }}>
           <div className="card-pad">
-            <div className="section-head"><h3>Upcoming renewals</h3><span className="hint">Next 30 days</span></div>
+            <div className="section-head"><h3>Upcoming renewals</h3><span className="hint">Next 30 days &middot; {fmtLKR(upcoming.reduce((sum, s) => sum + s.amount, 0))} total</span></div>
             <div className="avatar-stack" style={{ marginBottom: 14 }}>
               {upcoming.slice(0, 8).map((s, i) => (
                 <span key={s.id} className="stack-item" style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }} title={s.name}>{initials(s.name)}</span>
               ))}
               {upcoming.length > 8 && <span className="stack-item stack-more">+{upcoming.length - 8}</span>}
             </div>
-            {upcoming.map((s, i) => (
-              <div className="sub-row" key={s.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span className="sub-icon" style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>{initials(s.name)}</span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</div>
-                    <div className="sub">{CYCLE_LABEL[s.billing_cycle]} &middot; {daysUntil(s.next_renewal_date) === 0 ? 'today' : `in ${daysUntil(s.next_renewal_date)} day(s)`} &middot; {fmtDate(s.next_renewal_date)}</div>
-                  </div>
+            {UPCOMING_SECTIONS.map((section) => {
+              const items = upcoming.filter((s) => section.test(daysUntil(s.next_renewal_date) ?? 0))
+              if (items.length === 0) return null
+              return (
+                <div key={section.key}>
+                  <div className="list-section-label">{section.label} <span className="count">&middot; {items.length}</span></div>
+                  {items.map((s) => {
+                    const colorIdx = upcoming.indexOf(s)
+                    const days = daysUntil(s.next_renewal_date) ?? 0
+                    return (
+                      <div className="sub-row" key={s.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                          <span className="sub-icon" style={{ background: AVATAR_COLORS[colorIdx % AVATAR_COLORS.length] }}>{initials(s.name)}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="sub-row-name">
+                              <span style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</span>
+                              <span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[s.owner]}</span>
+                            </div>
+                            <div className="sub-row-meta">
+                              <span className="pill neutral">{CYCLE_LABEL[s.billing_cycle]}</span>
+                              <span className={`pill ${urgencyPillClass(days)}`}>{urgencyLabel(days)}</span>
+                              <span className="sub" style={{ fontSize: 11.5 }}>{fmtDate(s.next_renewal_date)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+                          <span className="num" style={{ fontWeight: 800 }}>{fmtLKR(s.amount)}</span>
+                          <button className="btn sm pill" disabled={loggingId === s.id} onClick={() => logPayment(s)}>{loggingId === s.id ? 'Logging…' : 'Log payment'}</button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="num" style={{ fontWeight: 800 }}>{fmtLKR(s.amount)}</span>
-                  <button className="btn sm pill" disabled={loggingId === s.id} onClick={() => logPayment(s)}>{loggingId === s.id ? 'Logging…' : 'Log payment'}</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}

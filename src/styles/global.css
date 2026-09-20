@@ -454,8 +454,18 @@ tbody tr:hover { background: var(--surface-2); }
 .avatar-stack .stack-item:first-child { margin-left: 0; }
 .avatar-stack .stack-more { background: var(--surface-2); color: var(--ink-2); }
 
+.list-section-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+  color: var(--ink-muted); display: flex; align-items: center; gap: 6px;
+  margin: 18px 0 4px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.list-section-label:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.list-section-label .count { font-weight: 800; color: var(--ink-2); }
+
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .sub-row:last-child { border-bottom: none; }
+.sub-row-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.sub-row-name { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .sub-row .sub-icon {
   width: 34px; height: 34px; border-radius: 11px; flex: none;
   display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #fff;
