@@ -2,11 +2,11 @@ import { createContext, useContext, useCallback, useEffect, useState, type React
 import {
   accountsApi, categoriesApi, clientsApi, listTransactions, assetsApi,
   investmentsApi, fixedDepositsApi, liabilitiesApi, invoicesApi, budgetsApi,
-  goalsApi, listSnapshots, workEntriesApi, subscriptionsApi,
+  goalsApi, goalContributionsApi, listSnapshots, workEntriesApi, subscriptionsApi,
 } from './api'
 import type {
   Account, Category, Client, Transaction, Asset, Investment, FixedDeposit,
-  Liability, Invoice, Budget, Goal, NetworthSnapshot, WorkEntry, Subscription,
+  Liability, Invoice, Budget, Goal, GoalContribution, NetworthSnapshot, WorkEntry, Subscription,
 } from './types'
 import { useAuth } from './useAuth'
 
@@ -22,6 +22,7 @@ interface DataState {
   invoices: Invoice[]
   budgets: Budget[]
   goals: Goal[]
+  goalContributions: GoalContribution[]
   snapshots: NetworthSnapshot[]
   workEntries: WorkEntry[]
   subscriptions: Subscription[]
@@ -32,7 +33,7 @@ interface DataState {
 type DataKey =
   | 'accounts' | 'categories' | 'clients' | 'transactions' | 'assets'
   | 'investments' | 'fixedDeposits' | 'liabilities' | 'invoices' | 'budgets'
-  | 'goals' | 'snapshots' | 'workEntries' | 'subscriptions'
+  | 'goals' | 'goalContributions' | 'snapshots' | 'workEntries' | 'subscriptions'
 
 const DataContext = createContext<DataState | null>(null)
 
@@ -48,6 +49,7 @@ const loaders: Record<DataKey, () => Promise<unknown>> = {
   invoices: () => invoicesApi.list('due_date', false),
   budgets: () => budgetsApi.list('month', false),
   goals: () => goalsApi.list('target_date', true),
+  goalContributions: () => goalContributionsApi.list('contribution_date', false),
   snapshots: () => listSnapshots(),
   workEntries: () => workEntriesApi.list('created_at', false),
   subscriptions: () => subscriptionsApi.list('next_renewal_date', true),
@@ -58,7 +60,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Omit<DataState, 'refresh'>>({
     accounts: [], categories: [], clients: [], transactions: [], assets: [],
     investments: [], fixedDeposits: [], liabilities: [], invoices: [],
-    budgets: [], goals: [], snapshots: [], workEntries: [], subscriptions: [], loading: true,
+    budgets: [], goals: [], goalContributions: [], snapshots: [], workEntries: [], subscriptions: [], loading: true,
   })
 
   const refresh = useCallback(async (key?: DataKey) => {

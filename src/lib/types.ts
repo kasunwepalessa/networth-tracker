@@ -163,7 +163,17 @@ export interface Goal {
   target_amount: number
   target_date: string | null
   current_amount: number
+  starting_amount: number
   notes: string | null
+  created_at: string
+}
+
+export interface GoalContribution {
+  id: string
+  goal_id: string
+  contribution_date: string
+  amount: number
+  note: string | null
   created_at: string
 }
 

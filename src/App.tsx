@@ -12,6 +12,7 @@ import Forecast from './pages/Forecast'
 import Invoices from './pages/Invoices'
 import Businesses from './pages/Businesses'
 import Goals from './pages/Goals'
+import GoalDetail from './pages/GoalDetail'
 import Subscriptions from './pages/Subscriptions'
 import NetWorthDetail from './pages/overview/NetWorthDetail'
 import CashFlowDetail from './pages/overview/CashFlowDetail'
@@ -36,6 +37,7 @@ function Gate() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/businesses" element={<Businesses />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/goals/:id" element={<GoalDetail />} />
             <Route path="/subscriptions" element={<Subscriptions />} />
             <Route path="/overview/net-worth" element={<NetWorthDetail />} />
             <Route path="/overview/cash-flow" element={<CashFlowDetail />} />

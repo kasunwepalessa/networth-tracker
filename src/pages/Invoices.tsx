@@ -214,8 +214,10 @@ export default function Invoices() {
 
   const linkedCount = clients.filter((c) => c.zoho_contact_id).length
 
-  const outstanding = invoices.filter((i) => i.status === 'sent' || i.status === 'overdue').reduce((s, i) => s + i.balance, 0)
+  const awaitingPayment = invoices.filter((i) => i.status === 'sent').reduce((s, i) => s + i.balance, 0)
+  const awaitingPaymentCount = invoices.filter((i) => i.status === 'sent').length
   const overdue = invoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.balance, 0)
+  const outstanding = awaitingPayment + overdue
   const draftCount = invoices.filter((i) => i.status === 'draft').length
 
   const clientTotals = useMemo(() => {
@@ -246,8 +248,13 @@ export default function Invoices() {
         </div>
       </div>
 
-      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+      <div className="grid cols-5" style={{ marginBottom: 16 }}>
         <div className="card card-pad kpi"><span className="label">Outstanding</span><span className="value num" style={{ color: 'var(--critical)' }}>{fmtLKR(outstanding)}</span></div>
+        <div className="card card-pad kpi">
+          <span className="label">Sent &middot; awaiting payment</span>
+          <span className="value num">{fmtLKR(awaitingPayment)}</span>
+          <span className="sub">{awaitingPaymentCount} invoice{awaitingPaymentCount === 1 ? '' : 's'}, not yet overdue</span>
+        </div>
         <div className="card card-pad kpi"><span className="label">Overdue</span><span className="value num" style={{ color: 'var(--critical)' }}>{fmtLKR(overdue)}</span></div>
         <div className="card card-pad kpi"><span className="label">Drafts</span><span className="value num">{draftCount}</span></div>
         <div className="card card-pad kpi"><span className="label">Total invoices</span><span className="value num">{invoices.length}</span></div>

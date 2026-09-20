@@ -240,6 +240,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .section-head .hint { font-size: 11.5px; color: var(--ink-muted); }
 
 .grid { display: grid; gap: 14px; }
+.grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
 .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
 .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
@@ -477,6 +478,7 @@ tbody tr:hover { background: var(--surface-2); }
 .hero-stat .hero-label { font-size: 12.5px; color: var(--ink-muted); margin-top: 4px; }
 
 @media (max-width: 900px) {
+  .grid.cols-5 { grid-template-columns: repeat(3, 1fr); }
   .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
   .grid.cols-3 { grid-template-columns: repeat(2, 1fr); }
   .app-shell { flex-direction: column; }
@@ -493,5 +495,5 @@ tbody tr:hover { background: var(--surface-2); }
   .content { padding: 18px 14px 48px; }
 }
 @media (max-width: 520px) {
-  .grid.cols-4, .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
+  .grid.cols-5, .grid.cols-4, .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
 }

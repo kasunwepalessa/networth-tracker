@@ -40,6 +40,7 @@ export default function Businesses() {
       income: number; expenses: number; profit: number; marginPct: number | null
       cash: number; clients: number
       invoices: Invoice[]; overdueCount: number; overdueAmount: number
+      awaitingCount: number; awaitingAmount: number; receivablesTotal: number
       subCost: number; trendPct: number | null
     }>
     BUSINESSES.forEach((biz) => {
@@ -51,12 +52,16 @@ export default function Businesses() {
       const cash = businessCashTotal(accounts, biz)
       const bizInvoices = businessInvoices(invoices, clients, biz)
       const overdue = bizInvoices.filter((i) => i.status === 'overdue')
+      const awaiting = bizInvoices.filter((i) => i.status === 'sent')
+      const overdueAmount = overdue.reduce((s, i) => s + i.balance, 0)
+      const awaitingAmount = awaiting.reduce((s, i) => s + i.balance, 0)
       const subCost = totalMonthlySubscriptionCost(businessSubscriptions(subscriptions, biz))
       const flow2 = businessMonthlyFlowSeries(transactions, biz, 2)
       const trendPct = pctChange(flow2[1]?.income ?? 0, flow2[0]?.income ?? 0)
       out[biz] = {
         income, expenses, profit, marginPct, cash, clients: businessClients(clients, biz).length,
-        invoices: bizInvoices, overdueCount: overdue.length, overdueAmount: overdue.reduce((s, i) => s + i.balance, 0),
+        invoices: bizInvoices, overdueCount: overdue.length, overdueAmount,
+        awaitingCount: awaiting.length, awaitingAmount, receivablesTotal: overdueAmount + awaitingAmount,
         subCost, trendPct,
       }
     })
@@ -185,9 +190,10 @@ export default function Businesses() {
                     <div className="num" style={{ fontWeight: 700, fontSize: 13 }}>{fmtCompact(s.cash)}</div>
                   </div>
                 </div>
-                {s.overdueCount > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <span className="pill critical">{s.overdueCount} overdue &middot; {fmtLKR(s.overdueAmount)}</span>
+                {(s.overdueCount > 0 || s.awaitingCount > 0) && (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {s.awaitingCount > 0 && <span className="pill brand">{s.awaitingCount} sent &middot; {fmtLKR(s.awaitingAmount)}</span>}
+                    {s.overdueCount > 0 && <span className="pill critical">{s.overdueCount} overdue &middot; {fmtLKR(s.overdueAmount)}</span>}
                   </div>
                 )}
               </div>
@@ -216,8 +222,8 @@ export default function Businesses() {
         </div>
         <div className="card card-pad kpi">
           <span className="label">Outstanding receivables</span>
-          <span className="value lg num" style={{ color: focusStats.overdueAmount > 0 ? 'var(--critical)' : 'var(--ink-1)' }}>{fmtCompact(focusStats.overdueAmount)}</span>
-          <span className="sub">{focusStats.overdueCount} overdue &middot; {focusStats.clients} client{focusStats.clients === 1 ? '' : 's'}</span>
+          <span className="value lg num" style={{ color: focusStats.receivablesTotal > 0 ? 'var(--critical)' : 'var(--ink-1)' }}>{fmtCompact(focusStats.receivablesTotal)}</span>
+          <span className="sub">{fmtCompact(focusStats.awaitingAmount)} sent, awaiting payment &middot; {fmtCompact(focusStats.overdueAmount)} overdue</span>
         </div>
         <div className="card card-pad kpi">
           <span className="label">Monthly subscriptions</span>

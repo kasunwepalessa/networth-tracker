@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { advanceRenewal } from './calc'
 import type {
   Account, Category, Client, Transaction, Asset, Investment,
-  FixedDeposit, Liability, Invoice, Budget, Goal, NetworthSnapshot, WorkEntry, Subscription,
+  FixedDeposit, Liability, Invoice, Budget, Goal, GoalContribution, NetworthSnapshot, WorkEntry, Subscription,
 } from './types'
 
 function table<T>(name: string) {
@@ -42,6 +42,18 @@ export const liabilitiesApi = table<Liability>('nw_liabilities')
 export const invoicesApi = table<Invoice>('nw_invoices')
 export const budgetsApi = table<Budget>('nw_budgets')
 export const goalsApi = table<Goal>('nw_goals')
+export const goalContributionsApi = table<GoalContribution>('nw_goal_contributions')
+
+/** Contributions logged for one goal, most recent first. */
+export async function listGoalContributions(goalId: string): Promise<GoalContribution[]> {
+  const { data, error } = await supabase
+    .from('nw_goal_contributions')
+    .select('*')
+    .eq('goal_id', goalId)
+    .order('contribution_date', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as GoalContribution[]
+}
 export const workEntriesApi = table<WorkEntry>('nw_work_entries')
 export const subscriptionsApi = table<Subscription>('nw_subscriptions')
 
