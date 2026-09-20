@@ -154,4 +154,37 @@ export const zohoApi = {
     const r = await callZoho({ action: 'push_expense', transaction_id: transactionId, subscription_id: subscriptionId })
     return { zoho_expense_id: r.zoho_expense_id as string, already_synced: r.already_synced as boolean | undefined }
   },
+  // Creates (first time) or updates (every time after) the Zoho invoice matching one local
+  // invoice, and best-effort carries a locally-set "sent"/"paid" status over to Zoho.
+  async pushInvoice(invoiceId: string): Promise<{ zoho_invoice_id: string; zoho_invoice_number?: string; zoho_status: string; zoho_balance: number }> {
+    const r = await callZoho({ action: 'push_invoice', invoice_id: invoiceId })
+    return {
+      zoho_invoice_id: r.zoho_invoice_id as string,
+      zoho_invoice_number: r.zoho_invoice_number as string | undefined,
+      zoho_status: r.zoho_status as string,
+      zoho_balance: r.zoho_balance as number,
+    }
+  },
+  // Refreshes one already-linked local invoice's status/balance from Zoho.
+  async pullInvoice(invoiceId: string): Promise<{ status: string; balance: number }> {
+    const r = await callZoho({ action: 'pull_invoice', invoice_id: invoiceId })
+    return { status: r.status as string, balance: r.balance as number }
+  },
+  // Bulk reconcile: refreshes every linked invoice from Zoho, then creates a Zoho invoice for
+  // every local invoice with a Zoho-linked client that hasn't been pushed yet. Capped per call
+  // (see the edge function) — call again while moreXPending comes back true.
+  async syncInvoices(limit = 25): Promise<{
+    pushed: number; pulled: number; pushErrors: string[]; pullErrors: string[]
+    morePushPending: boolean; morePullPending: boolean
+  }> {
+    const r = await callZoho({ action: 'sync_invoices', limit })
+    return {
+      pushed: r.pushed as number,
+      pulled: r.pulled as number,
+      pushErrors: (r.pushErrors ?? []) as string[],
+      pullErrors: (r.pullErrors ?? []) as string[],
+      morePushPending: !!r.morePushPending,
+      morePullPending: !!r.morePullPending,
+    }
+  },
 }

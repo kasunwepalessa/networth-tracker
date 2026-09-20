@@ -16,6 +16,7 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false)
   const [newClientName, setNewClientName] = useState('')
   const [addingClient, setAddingClient] = useState(false)
+  const [zohoSyncing, setZohoSyncing] = useState(false)
 
   // --- work log / Zoho state ---
   const [syncing, setSyncing] = useState(false)
@@ -35,16 +36,61 @@ export default function Invoices() {
     setSaving(true)
     try {
       const payload = { ...editing, balance: editing.status === 'paid' ? 0 : (editing.balance ?? editing.amount ?? 0) }
-      if (payload.id) await invoicesApi.update(payload.id, payload)
-      else await invoicesApi.create(payload)
+      const saved = payload.id ? await invoicesApi.update(payload.id, payload) : await invoicesApi.create(payload)
       await refresh('invoices')
       setEditing(null)
+      // Best-effort: every save pushes this invoice's latest state to Zoho, so nothing here
+      // ever has to be re-entered there by hand. A failure doesn't undo the local save — it
+      // can be retried any time with "Sync with Zoho".
+      try {
+        await zohoApi.pushInvoice(saved.id)
+        await refresh('invoices')
+      } catch (e) {
+        alert(`Saved locally, but syncing to Zoho failed: ${(e as Error).message}\nYou can retry with "Sync with Zoho".`)
+      }
     } finally { setSaving(false) }
   }
   async function remove(id: string) {
     if (!confirm('Delete this invoice?')) return
     await invoicesApi.remove(id)
     await refresh('invoices')
+  }
+
+  // Bulk reconcile: refreshes every already-linked invoice from Zoho (status, balance,
+  // payments made there directly), and creates a real Zoho invoice for every local invoice
+  // that has a Zoho-linked client but was never pushed. Since that second part can create
+  // real records in the user's live Zoho account, it always confirms the exact counts first.
+  async function syncAllWithZoho() {
+    const unlinkedCount = invoices.filter((i) => i.client_id && !i.zoho_invoice_id && clients.find((c) => c.id === i.client_id)?.zoho_contact_id).length
+    const linkedCount = invoices.filter((i) => i.zoho_invoice_id).length
+    if (unlinkedCount === 0 && linkedCount === 0) {
+      alert('Nothing to sync yet — link a client to Zoho (see "Sync customers from Zoho" below) and save an invoice first.')
+      return
+    }
+    const parts: string[] = []
+    if (unlinkedCount > 0) parts.push(`create ${unlinkedCount} new invoice${unlinkedCount === 1 ? '' : 's'} in your real Zoho account`)
+    if (linkedCount > 0) parts.push(`refresh ${linkedCount} already-linked invoice${linkedCount === 1 ? '' : 's'} from Zoho (status, balance, payments)`)
+    if (!confirm(`This will ${parts.join(' and ')}. Continue?`)) return
+
+    setZohoSyncing(true)
+    let totalPushed = 0
+    let totalPulled = 0
+    const errors: string[] = []
+    try {
+      for (let round = 0; round < 12; round++) {
+        const r = await zohoApi.syncInvoices(25)
+        totalPushed += r.pushed
+        totalPulled += r.pulled
+        errors.push(...r.pushErrors, ...r.pullErrors)
+        await refresh('invoices')
+        if (!r.morePushPending && !r.morePullPending) break
+      }
+      alert(`Synced with Zoho: ${totalPushed} invoice${totalPushed === 1 ? '' : 's'} created, ${totalPulled} refreshed.${errors.length ? `\n\n${errors.length} issue(s):\n${errors.slice(0, 8).join('\n')}` : ''}`)
+    } catch (e) {
+      alert(`Sync with Zoho failed: ${(e as Error).message}`)
+    } finally {
+      setZohoSyncing(false)
+    }
   }
 
   // Creates a client locally, then creates the matching contact in Zoho and links the two.
@@ -188,7 +234,10 @@ export default function Invoices() {
           <h2>Invoices</h2>
           <div className="sub">Client invoices — draft, sent, paid, overdue</div>
         </div>
-        <button className="btn primary" onClick={() => setEditing(empty)}>+ Add invoice</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={syncAllWithZoho} disabled={zohoSyncing} title="Pushes every unlinked invoice to Zoho as a new invoice, and pulls the latest status/balance for invoices already linked — every save also does this automatically for that one invoice.">{zohoSyncing ? 'Syncing…' : 'Sync with Zoho'}</button>
+          <button className="btn primary" onClick={() => setEditing(empty)}>+ Add invoice</button>
+        </div>
       </div>
 
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
@@ -204,7 +253,7 @@ export default function Invoices() {
             <div className="empty">No invoices yet.</div>
           ) : (
             <div className="table-scroll"><table>
-              <thead><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th></th></tr></thead>
+              <thead><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th>Zoho</th><th></th></tr></thead>
               <tbody>
                 {invoices.map((i) => (
                   <tr key={i.id}>
@@ -214,6 +263,11 @@ export default function Invoices() {
                     <td className="num">{fmtLKR(i.amount)}</td>
                     <td className="num" style={{ color: i.balance > 0 ? 'var(--critical)' : undefined }}>{fmtLKR(i.balance)}</td>
                     <td>{fmtDate(i.due_date)}</td>
+                    <td>
+                      {i.zoho_invoice_id ? (
+                        <a className="pill good" style={{ textDecoration: 'none' }} href={`https://invoice.zoho.com/app/${ZOHO_ORG_ID}#/invoices/${i.zoho_invoice_id}`} target="_blank" rel="noreferrer">Linked</a>
+                      ) : <span className="pill neutral">Not yet</span>}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <button className="btn sm" onClick={() => setEditing(i)}>Edit</button>{' '}
                       <button className="btn sm danger" onClick={() => remove(i.id)}>Delete</button>
