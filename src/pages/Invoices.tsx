@@ -78,35 +78,36 @@ export default function Invoices() {
   }
 
   // Bulk reconcile: refreshes every already-linked invoice from Zoho (status, balance,
-  // payments made there directly), and creates a real Zoho invoice for every local invoice
-  // that has a Zoho-linked client but was never pushed. Since that second part can create
-  // real records in the user's live Zoho account, it always confirms the exact counts first.
+  // payments made there directly), creates a real Zoho invoice for every local invoice
+  // that has a Zoho-linked client but was never pushed, and imports any invoice that
+  // exists in Zoho but not locally yet (draft/sent/paid — e.g. invoices created directly
+  // in Zoho). Since the push and import steps can create real local/Zoho records, it
+  // always confirms first.
   async function syncAllWithZoho() {
     const unlinkedCount = invoices.filter((i) => i.client_id && !i.zoho_invoice_id && clients.find((c) => c.id === i.client_id)?.zoho_contact_id).length
     const linkedCount = invoices.filter((i) => i.zoho_invoice_id).length
-    if (unlinkedCount === 0 && linkedCount === 0) {
-      alert('Nothing to sync yet — link a client to Zoho (see "Sync customers from Zoho" below) and save an invoice first.')
-      return
-    }
     const parts: string[] = []
     if (unlinkedCount > 0) parts.push(`create ${unlinkedCount} new invoice${unlinkedCount === 1 ? '' : 's'} in your real Zoho account`)
     if (linkedCount > 0) parts.push(`refresh ${linkedCount} already-linked invoice${linkedCount === 1 ? '' : 's'} from Zoho (status, balance, payments)`)
-    if (!confirm(`This will ${parts.join(' and ')}. Continue?`)) return
+    parts.push('import any invoices that exist in Zoho but not here yet (e.g. drafts created directly in Zoho)')
+    if (!confirm(`This will ${parts.join(', ')}. Continue?`)) return
 
     setZohoSyncing(true)
     let totalPushed = 0
     let totalPulled = 0
+    let totalImported = 0
     const errors: string[] = []
     try {
       for (let round = 0; round < 12; round++) {
         const r = await zohoApi.syncInvoices(25)
         totalPushed += r.pushed
         totalPulled += r.pulled
-        errors.push(...r.pushErrors, ...r.pullErrors)
+        totalImported += r.imported
+        errors.push(...r.pushErrors, ...r.pullErrors, ...r.importErrors)
         await refresh('invoices')
-        if (!r.morePushPending && !r.morePullPending) break
+        if (!r.morePushPending && !r.morePullPending && !r.moreImportPending) break
       }
-      alert(`Synced with Zoho: ${totalPushed} invoice${totalPushed === 1 ? '' : 's'} created, ${totalPulled} refreshed.${errors.length ? `\n\n${errors.length} issue(s):\n${errors.slice(0, 8).join('\n')}` : ''}`)
+      alert(`Synced with Zoho: ${totalPushed} invoice${totalPushed === 1 ? '' : 's'} created, ${totalPulled} refreshed, ${totalImported} imported from Zoho.${errors.length ? `\n\n${errors.length} issue(s):\n${errors.slice(0, 8).join('\n')}` : ''}`)
     } catch (e) {
       alert(`Sync with Zoho failed: ${(e as Error).message}`)
     } finally {
@@ -262,7 +263,7 @@ export default function Invoices() {
           <div className="sub">Client invoices — categorized as Draft, Unpaid and Paid, same as Zoho Invoice</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" onClick={syncAllWithZoho} disabled={zohoSyncing} title="Pushes every unlinked invoice to Zoho as a new invoice, and pulls the latest status/balance for invoices already linked — every save also does this automatically for that one invoice.">{zohoSyncing ? 'Syncing…' : 'Sync with Zoho'}</button>
+          <button className="btn" onClick={syncAllWithZoho} disabled={zohoSyncing} title="Pushes every unlinked invoice to Zoho as a new invoice, pulls the latest status/balance for invoices already linked, and imports any invoice that exists in Zoho but not here yet — every save also does the push/pull part automatically for that one invoice.">{zohoSyncing ? 'Syncing…' : 'Sync with Zoho'}</button>
           <button className="btn primary" onClick={() => setEditing(empty)}>+ Add invoice</button>
         </div>
       </div>

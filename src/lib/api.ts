@@ -182,21 +182,26 @@ export const zohoApi = {
     const r = await callZoho({ action: 'pull_invoice', invoice_id: invoiceId })
     return { status: r.status as string, balance: r.balance as number }
   },
-  // Bulk reconcile: refreshes every linked invoice from Zoho, then creates a Zoho invoice for
-  // every local invoice with a Zoho-linked client that hasn't been pushed yet. Capped per call
-  // (see the edge function) — call again while moreXPending comes back true.
+  // Bulk reconcile: refreshes every linked invoice from Zoho, creates a Zoho invoice for every
+  // local invoice with a Zoho-linked client that hasn't been pushed yet, and imports any invoice
+  // that exists in Zoho but not locally (draft/sent/paid, matched by Zoho invoice ID). Capped per
+  // call (see the edge function) — call again while moreXPending comes back true.
   async syncInvoices(limit = 25): Promise<{
-    pushed: number; pulled: number; pushErrors: string[]; pullErrors: string[]
-    morePushPending: boolean; morePullPending: boolean
+    pushed: number; pulled: number; imported: number
+    pushErrors: string[]; pullErrors: string[]; importErrors: string[]
+    morePushPending: boolean; morePullPending: boolean; moreImportPending: boolean
   }> {
     const r = await callZoho({ action: 'sync_invoices', limit })
     return {
       pushed: r.pushed as number,
       pulled: r.pulled as number,
+      imported: (r.imported ?? 0) as number,
       pushErrors: (r.pushErrors ?? []) as string[],
       pullErrors: (r.pullErrors ?? []) as string[],
+      importErrors: (r.importErrors ?? []) as string[],
       morePushPending: !!r.morePushPending,
       morePullPending: !!r.morePullPending,
+      moreImportPending: !!r.moreImportPending,
     }
   },
 }
