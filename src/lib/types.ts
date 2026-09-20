@@ -1,0 +1,167 @@
+export type Owner = 'personal' | 'business'
+
+export interface Account {
+  id: string
+  name: string
+  type: 'bank' | 'cash' | 'wallet' | 'credit_card'
+  owner: Owner
+  currency: string
+  balance: number
+  credit_limit: number | null
+  notes: string | null
+  archived: boolean
+  created_at: string
+}
+
+export interface Category {
+  id: string
+  name: string
+  kind: 'income' | 'expense'
+  owner_scope: Owner | 'both'
+  created_at: string
+}
+
+export interface Client {
+  id: string
+  name: string
+  notes: string | null
+  zoho_contact_id: string | null
+  created_at: string
+}
+
+export interface Transaction {
+  id: string
+  txn_date: string
+  account_id: string | null
+  category_id: string | null
+  amount: number
+  description: string | null
+  owner: Owner
+  client_id: string | null
+  project_name: string | null
+  is_recurring: boolean
+  recurring_frequency: 'weekly' | 'monthly' | 'yearly' | null
+  source: string
+  created_at: string
+}
+
+export type AssetType =
+  | 'property'
+  | 'vehicle'
+  | 'equipment'
+  | 'electronics'
+  | 'gold'
+  | 'business_asset'
+  | 'receivable'
+  | 'other'
+
+export interface Asset {
+  id: string
+  name: string
+  type: AssetType
+  owner: Owner
+  quantity: number
+  purchase_price: number | null
+  current_value: number
+  purchase_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type InvestmentType = 'shares' | 'unit_trust' | 'etf' | 'crypto'
+
+export interface Investment {
+  id: string
+  name: string
+  type: InvestmentType
+  owner: Owner
+  quantity: number
+  purchase_price: number
+  current_price: number
+  purchase_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface FixedDeposit {
+  id: string
+  bank: string
+  owner: Owner
+  amount: number
+  rate: number
+  start_date: string
+  maturity_date: string
+  expected_interest: number | null
+  status: 'active' | 'matured' | 'reinvested' | 'withdrawn'
+  notes: string | null
+  created_at: string
+}
+
+export type LiabilityType =
+  | 'personal_loan'
+  | 'vehicle_lease'
+  | 'mortgage'
+  | 'credit_card_balance'
+  | 'business_loan'
+  | 'supplier_payment'
+  | 'owed_to_others'
+
+export interface Liability {
+  id: string
+  name: string
+  type: LiabilityType
+  owner: Owner
+  principal: number | null
+  remaining_balance: number
+  interest_rate: number | null
+  monthly_payment: number | null
+  start_date: string | null
+  payoff_date: string | null
+  next_due_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface Invoice {
+  id: string
+  client_id: string | null
+  zoho_invoice_id: string | null
+  invoice_number: string | null
+  amount: number
+  balance: number
+  status: 'draft' | 'sent' | 'paid' | 'overdue'
+  issue_date: string | null
+  due_date: string | null
+  paid_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface Budget {
+  id: string
+  category_id: string
+  owner: Owner
+  month: string
+  limit_amount: number
+  created_at: string
+}
+
+export interface Goal {
+  id: string
+  name: string
+  type: string
+  target_amount: number
+  target_date: string | null
+  current_amount: number
+  notes: string | null
+  created_at: string
+}
+
+export interface NetworthSnapshot {
+  snapshot_date: string
+  total_assets: number
+  total_liabilities: number
+  net_worth: number
+  cash_total: number
+  created_at: string
+}
