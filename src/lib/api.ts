@@ -1,7 +1,8 @@
 import { supabase } from './supabase'
+import { advanceRenewal } from './calc'
 import type {
   Account, Category, Client, Transaction, Asset, Investment,
-  FixedDeposit, Liability, Invoice, Budget, Goal, NetworthSnapshot, WorkEntry,
+  FixedDeposit, Liability, Invoice, Budget, Goal, NetworthSnapshot, WorkEntry, Subscription,
 } from './types'
 
 function table<T>(name: string) {
@@ -42,6 +43,27 @@ export const invoicesApi = table<Invoice>('nw_invoices')
 export const budgetsApi = table<Budget>('nw_budgets')
 export const goalsApi = table<Goal>('nw_goals')
 export const workEntriesApi = table<WorkEntry>('nw_work_entries')
+export const subscriptionsApi = table<Subscription>('nw_subscriptions')
+
+/** Logs this cycle's payment for a subscription as a real transaction, and rolls the
+ *  subscription's next_renewal_date forward to the following cycle. */
+export async function logSubscriptionPayment(sub: Subscription): Promise<void> {
+  const payload: Partial<Transaction> = {
+    txn_date: sub.next_renewal_date,
+    amount: -Math.abs(sub.amount),
+    description: sub.name,
+    owner: sub.owner,
+    category_id: sub.category_id,
+    account_id: sub.account_id,
+    client_id: null,
+    project_name: null,
+    is_recurring: true,
+    recurring_frequency: sub.billing_cycle === 'quarterly' ? 'monthly' : sub.billing_cycle,
+    source: 'subscription',
+  }
+  await transactionsApi.create(payload)
+  await subscriptionsApi.update(sub.id, { next_renewal_date: advanceRenewal(sub.next_renewal_date, sub.billing_cycle) })
+}
 
 export async function listTransactions(orderBy = 'txn_date', ascending = false): Promise<Transaction[]> {
   const { data, error } = await supabase.from('nw_transactions').select('*').order(orderBy, { ascending })

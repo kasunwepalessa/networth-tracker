@@ -174,6 +174,22 @@ export interface WorkEntry {
   created_at: string
 }
 
+export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+
+export interface Subscription {
+  id: string
+  name: string
+  amount: number
+  billing_cycle: BillingCycle
+  next_renewal_date: string
+  owner: Owner
+  category_id: string | null
+  account_id: string | null
+  status: 'active' | 'cancelled'
+  notes: string | null
+  created_at: string
+}
+
 export interface NetworthSnapshot {
   snapshot_date: string
   total_assets: number

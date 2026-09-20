@@ -11,6 +11,11 @@ import Budgets from './pages/Budgets'
 import Forecast from './pages/Forecast'
 import Invoices from './pages/Invoices'
 import Goals from './pages/Goals'
+import Subscriptions from './pages/Subscriptions'
+import NetWorthDetail from './pages/overview/NetWorthDetail'
+import CashFlowDetail from './pages/overview/CashFlowDetail'
+import HealthDetail from './pages/overview/HealthDetail'
+import ReceivablesDetail from './pages/overview/ReceivablesDetail'
 
 function Gate() {
   const { session, loading } = useAuth()
@@ -29,6 +34,11 @@ function Gate() {
             <Route path="/forecast" element={<Forecast />} />
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
+            <Route path="/overview/net-worth" element={<NetWorthDetail />} />
+            <Route path="/overview/cash-flow" element={<CashFlowDetail />} />
+            <Route path="/overview/health" element={<HealthDetail />} />
+            <Route path="/overview/receivables" element={<ReceivablesDetail />} />
           </Route>
         </Routes>
       </HashRouter>

@@ -1,5 +1,5 @@
 import type {
-  Account, Asset, Investment, FixedDeposit, Liability, Transaction, Invoice, Owner, Category,
+  Account, Asset, Investment, FixedDeposit, Liability, Transaction, Invoice, Owner, Category, Subscription,
 } from './types'
 import { monthKey } from './format'
 
@@ -254,6 +254,13 @@ export function addMonths(date: Date, months: number): Date {
   return d
 }
 
+export interface HealthFactor {
+  key: string
+  label: string
+  detail: string
+  contribution: number // points added/subtracted, for display
+}
+
 /** Simple 0-100 financial health score from a handful of common signals. */
 export function financialHealthScore(input: {
   netWorth: number
@@ -263,29 +270,44 @@ export function financialHealthScore(input: {
   overdueInvoiceCount: number
   savingsRatePct: number // (income-expenses)/income this month
   liabilityToAssetRatio: number // 0..1+
-}): { score: number; label: string } {
+}): { score: number; label: string; factors: HealthFactor[] } {
   let score = 50
+  const factors: HealthFactor[] = []
 
   // Runway: months of expenses covered by cash
   const runwayMonths = input.monthlyExpenses > 0 ? input.cash / input.monthlyExpenses : 3
-  score += Math.max(-15, Math.min(20, (runwayMonths - 1) * 8))
+  const runwayPts = Math.max(-15, Math.min(20, (runwayMonths - 1) * 8))
+  score += runwayPts
+  factors.push({ key: 'runway', label: 'Cash runway', detail: `${runwayMonths.toFixed(1)} months of expenses covered by cash`, contribution: runwayPts })
 
   // Savings rate
-  score += Math.max(-15, Math.min(20, input.savingsRatePct * 0.4))
+  const savingsPts = Math.max(-15, Math.min(20, input.savingsRatePct * 0.4))
+  score += savingsPts
+  factors.push({ key: 'savings', label: 'Savings rate', detail: `${input.savingsRatePct.toFixed(0)}% of income kept this period`, contribution: savingsPts })
 
   // Debt load
-  score += Math.max(-25, Math.min(10, (0.4 - input.liabilityToAssetRatio) * 40))
+  const debtPts = Math.max(-25, Math.min(10, (0.4 - input.liabilityToAssetRatio) * 40))
+  score += debtPts
+  factors.push({ key: 'debt', label: 'Debt load', detail: `Liabilities are ${(input.liabilityToAssetRatio * 100).toFixed(0)}% of assets`, contribution: debtPts })
 
   // Net worth trending positive
-  score += input.netWorth > 0 ? 5 : -10
+  const nwPts = input.netWorth > 0 ? 5 : -10
+  score += nwPts
+  factors.push({ key: 'networth', label: 'Net worth', detail: input.netWorth > 0 ? 'Net worth is positive' : 'Net worth is negative', contribution: nwPts })
 
   // Overdue penalties
-  score -= input.overdueLiabilityCount * 4
-  score -= input.overdueInvoiceCount * 2
+  const overduePts = -(input.overdueLiabilityCount * 4 + input.overdueInvoiceCount * 2)
+  score += overduePts
+  factors.push({
+    key: 'overdue',
+    label: 'Overdue items',
+    detail: `${input.overdueLiabilityCount} overdue payment(s), ${input.overdueInvoiceCount} overdue invoice(s)`,
+    contribution: overduePts,
+  })
 
   score = Math.max(0, Math.min(100, Math.round(score)))
   const label = score >= 80 ? 'Excellent' : score >= 65 ? 'Good' : score >= 45 ? 'Fair' : score >= 25 ? 'Needs attention' : 'At risk'
-  return { score, label }
+  return { score, label, factors }
 }
 
 export interface MonthlyFlow {
@@ -317,6 +339,18 @@ export function expenseByCategory(
   transactions: Transaction[], categories: Category[], month: string, owner?: Owner, topN = 6,
 ): CategorySlice[] {
   const txns = monthTransactions(transactions, month, owner).filter((t) => t.amount < 0)
+  return categorySlices(txns, categories, topN)
+}
+
+/** Expense total per category over an arbitrary period range (or all time if range is null), sorted descending. */
+export function expenseByCategoryInRange(
+  transactions: Transaction[], categories: Category[], range: PeriodRange | null, owner?: Owner, topN = 6,
+): CategorySlice[] {
+  const txns = transactions.filter((t) => (!owner || t.owner === owner) && t.amount < 0 && inRange(t.txn_date, range))
+  return categorySlices(txns, categories, topN)
+}
+
+function categorySlices(txns: Transaction[], categories: Category[], topN: number): CategorySlice[] {
   const byCat = new Map<string, number>()
   txns.forEach((t) => {
     const cat = categories.find((c) => c.id === t.category_id)
@@ -330,4 +364,68 @@ export function expenseByCategory(
   const head = sorted.slice(0, topN)
   const rest = sorted.slice(topN).reduce((s, c) => s + c.amount, 0)
   return rest > 0 ? [...head, { name: 'Other', amount: rest }] : head
+}
+
+/** Transactions within a period range (or all, when range is null), optionally scoped to an owner. */
+export function transactionsInRange(transactions: Transaction[], range: PeriodRange | null, owner?: Owner): Transaction[] {
+  return transactions.filter((t) => (!owner || t.owner === owner) && inRange(t.txn_date, range))
+}
+
+// --- Subscriptions / recurring expenses ---
+
+const CYCLE_TO_MONTHLY: Record<Subscription['billing_cycle'], number> = {
+  weekly: 52 / 12,
+  monthly: 1,
+  quarterly: 1 / 3,
+  yearly: 1 / 12,
+}
+
+/** Normalizes any billing cycle to a monthly-equivalent cost. */
+export function subscriptionMonthlyCost(sub: Pick<Subscription, 'amount' | 'billing_cycle'>): number {
+  return sub.amount * CYCLE_TO_MONTHLY[sub.billing_cycle]
+}
+
+export function totalMonthlySubscriptionCost(subs: Subscription[], owner?: Owner): number {
+  return subs
+    .filter((s) => s.status === 'active' && (!owner || s.owner === owner))
+    .reduce((sum, s) => sum + subscriptionMonthlyCost(s), 0)
+}
+
+export function totalYearlySubscriptionCost(subs: Subscription[], owner?: Owner): number {
+  return totalMonthlySubscriptionCost(subs, owner) * 12
+}
+
+/** Active subscriptions renewing within `days` days from today, soonest first. */
+export function upcomingSubscriptions(subs: Subscription[], days = 30, owner?: Owner): Subscription[] {
+  return subs
+    .filter((s) => s.status === 'active' && (!owner || s.owner === owner))
+    .filter((s) => {
+      const d = daysUntilDate(s.next_renewal_date)
+      return d !== null && d >= 0 && d <= days
+    })
+    .sort((a, b) => a.next_renewal_date.localeCompare(b.next_renewal_date))
+}
+
+function daysUntilDate(d: string | null | undefined): number | null {
+  if (!d) return null
+  const target = new Date(d + 'T00:00:00')
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - now.getTime()) / 86400000)
+}
+
+/** Advances a subscription's next_renewal_date forward by one billing cycle, rolling past today if overdue. */
+export function advanceRenewal(dateISO: string, cycle: Subscription['billing_cycle']): string {
+  let d = new Date(dateISO + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let guard = 0
+  do {
+    if (cycle === 'weekly') d.setDate(d.getDate() + 7)
+    else if (cycle === 'monthly') d.setMonth(d.getMonth() + 1)
+    else if (cycle === 'quarterly') d.setMonth(d.getMonth() + 3)
+    else d.setFullYear(d.getFullYear() + 1)
+    guard++
+  } while (d <= today && guard < 500)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

@@ -1,12 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../lib/useAuth'
+import ThemeSwitcher from './ThemeSwitcher'
 
 const LINKS = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/accounts', label: 'Accounts' },
   { to: '/transactions', label: 'Transactions' },
   { to: '/portfolio', label: 'Assets & Liabilities' },
+  { to: '/subscriptions', label: 'Subscriptions' },
   { to: '/budgets', label: 'Budgets' },
   { to: '/forecast', label: 'Forecast' },
   { to: '/invoices', label: 'Invoices' },
@@ -31,12 +33,18 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <button className="signout" onClick={() => signOut()}>Sign out</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '0 4px' }}>
+          <button className="signout" style={{ flex: 1 }} onClick={() => signOut()}>Sign out</button>
+          <ThemeSwitcher />
+        </div>
       </aside>
 
       <div className="mobile-topbar">
         <h1>Net Worth</h1>
-        <button className="icon-btn" onClick={() => setMobileOpen((v) => !v)} aria-label="Menu">☰</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThemeSwitcher />
+          <button className="icon-btn" onClick={() => setMobileOpen((v) => !v)} aria-label="Menu">☰</button>
+        </div>
       </div>
       {mobileOpen && (
         <div className="mobile-nav">
