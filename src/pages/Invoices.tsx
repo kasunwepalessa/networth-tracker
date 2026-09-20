@@ -40,13 +40,19 @@ export default function Invoices() {
       await refresh('invoices')
       setEditing(null)
       // Best-effort: every save pushes this invoice's latest state to Zoho, so nothing here
-      // ever has to be re-entered there by hand. A failure doesn't undo the local save — it
-      // can be retried any time with "Sync with Zoho".
+      // ever has to be re-entered there by hand. A failure doesn't undo the local save — but
+      // if this invoice was already linked to Zoho, the status/balance just written above
+      // (e.g. balance auto-zeroed for "paid") is only a local guess until the push confirms
+      // it, so on failure it's corrected back from Zoho's real state rather than left wrong.
       try {
         await zohoApi.pushInvoice(saved.id)
-        await refresh('invoices')
       } catch (e) {
+        if (saved.zoho_invoice_id) {
+          try { await zohoApi.pullInvoice(saved.id) } catch { /* best-effort correction only */ }
+        }
         alert(`Saved locally, but syncing to Zoho failed: ${(e as Error).message}\nYou can retry with "Sync with Zoho".`)
+      } finally {
+        await refresh('invoices')
       }
     } finally { setSaving(false) }
   }
