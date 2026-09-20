@@ -244,8 +244,8 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="topbar rise">
-        <div className="welcome">
+      <div className="topbar">
+        <div className="welcome rise">
           <h2>Welcome back, <span className="name">{firstName}</span></h2>
           <span className="sub">{todayLabel} &middot; personal &amp; business net worth, at a glance</span>
         </div>
