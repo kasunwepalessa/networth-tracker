@@ -3,9 +3,10 @@ import { useData } from '../lib/useData'
 import { accountsApi } from '../lib/api'
 import Modal from '../components/Modal'
 import { fmtLKR, ACCOUNT_TYPE_LABEL, OWNER_LABEL } from '../lib/format'
+import { BUSINESS_LABEL, BUSINESSES } from '../lib/businessCalc'
 import type { Account, Owner } from '../lib/types'
 
-const empty: Partial<Account> = { name: '', type: 'bank', owner: 'personal', currency: 'LKR', balance: 0, credit_limit: null, notes: '' }
+const empty: Partial<Account> = { name: '', type: 'bank', owner: 'personal', business: null, currency: 'LKR', balance: 0, credit_limit: null, notes: '' }
 
 export default function Accounts() {
   const { accounts, refresh, loading } = useData()
@@ -78,7 +79,7 @@ export default function Accounts() {
                     <tr key={a.id}>
                       <td>{a.name}{a.notes ? <div className="sub" style={{ fontSize: 11 }}>{a.notes}</div> : null}</td>
                       <td>{ACCOUNT_TYPE_LABEL[a.type]}</td>
-                      <td><span className={`pill ${a.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[a.owner]}</span></td>
+                      <td><span className={`pill ${a.owner === 'business' ? 'brand' : 'accent'}`}>{a.owner === 'business' && a.business ? BUSINESS_LABEL[a.business] : OWNER_LABEL[a.owner]}</span></td>
                       <td className="num" style={{ color: a.balance < 0 ? 'var(--critical)' : undefined }}>{fmtLKR(a.balance)}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn sm" onClick={() => setEditing(a)}>Edit</button>{' '}
@@ -113,11 +114,25 @@ export default function Accounts() {
             </div>
             <div className="field">
               <label>Owner</label>
-              <select value={editing.owner ?? 'personal'} onChange={(e) => setEditing({ ...editing, owner: e.target.value as Owner })}>
+              <select
+                value={editing.owner ?? 'personal'}
+                onChange={(e) => {
+                  const owner = e.target.value as Owner
+                  setEditing({ ...editing, owner, business: owner === 'business' ? (editing.business ?? 'nexxel') : null })
+                }}
+              >
                 <option value="personal">Personal</option>
                 <option value="business">Business</option>
               </select>
             </div>
+            {editing.owner === 'business' && (
+              <div className="field">
+                <label>Which business</label>
+                <select value={editing.business ?? 'nexxel'} onChange={(e) => setEditing({ ...editing, business: e.target.value as Account['business'] })}>
+                  {BUSINESSES.map((b) => <option key={b} value={b}>{BUSINESS_LABEL[b]}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div className="field-row">
             <div className="field">

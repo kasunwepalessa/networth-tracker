@@ -1,10 +1,14 @@
 export type Owner = 'personal' | 'business'
 
+/** Which of Kasun's businesses a business-owned record belongs to. */
+export type Business = 'nexxel' | 'sweet_cocoa'
+
 export interface Account {
   id: string
   name: string
   type: 'bank' | 'cash' | 'wallet' | 'credit_card'
   owner: Owner
+  business: Business | null
   currency: string
   balance: number
   credit_limit: number | null
@@ -26,6 +30,7 @@ export interface Category {
 export interface Client {
   id: string
   name: string
+  business: Business
   notes: string | null
   zoho_contact_id: string | null
   created_at: string
@@ -39,6 +44,7 @@ export interface Transaction {
   amount: number
   description: string | null
   owner: Owner
+  business: Business | null
   client_id: string | null
   project_name: string | null
   is_recurring: boolean
@@ -187,6 +193,7 @@ export interface Subscription {
   billing_cycle: BillingCycle
   next_renewal_date: string
   owner: Owner
+  business: Business | null
   category_id: string | null
   account_id: string | null
   status: 'active' | 'cancelled'

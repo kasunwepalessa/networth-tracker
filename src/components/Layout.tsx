@@ -12,6 +12,7 @@ const LINKS = [
   { to: '/budgets', label: 'Budgets' },
   { to: '/forecast', label: 'Forecast' },
   { to: '/invoices', label: 'Invoices' },
+  { to: '/businesses', label: 'Businesses' },
   { to: '/goals', label: 'Goals' },
 ]
 

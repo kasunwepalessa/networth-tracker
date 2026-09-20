@@ -4,6 +4,7 @@ import { subscriptionsApi, logSubscriptionPayment } from '../lib/api'
 import { totalMonthlySubscriptionCost, totalYearlySubscriptionCost, upcomingSubscriptions, subscriptionMonthlyCost } from '../lib/calc'
 import { fmtLKR, fmtDate, todayISO, daysUntil, OWNER_LABEL } from '../lib/format'
 import { useCountUp } from '../lib/useCountUp'
+import { BUSINESS_LABEL, BUSINESSES } from '../lib/businessCalc'
 import Modal from '../components/Modal'
 import type { Subscription, Owner, BillingCycle } from '../lib/types'
 
@@ -11,7 +12,7 @@ const CYCLE_LABEL: Record<BillingCycle, string> = { weekly: 'Weekly', monthly: '
 const AVATAR_COLORS = ['var(--brand)', 'var(--accent)', 'var(--cat-1)', 'var(--cat-5)', 'var(--cat-7)', 'var(--cat-2)']
 
 const empty: Partial<Subscription> = {
-  name: '', amount: 0, billing_cycle: 'monthly', next_renewal_date: todayISO(), owner: 'personal',
+  name: '', amount: 0, billing_cycle: 'monthly', next_renewal_date: todayISO(), owner: 'personal', business: null,
   category_id: null, account_id: null, status: 'active', notes: '',
 }
 
@@ -154,7 +155,7 @@ export default function Subscriptions() {
                           <div style={{ minWidth: 0 }}>
                             <div className="sub-row-name">
                               <span style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</span>
-                              <span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[s.owner]}</span>
+                              <span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{s.owner === 'business' && s.business ? BUSINESS_LABEL[s.business] : OWNER_LABEL[s.owner]}</span>
                             </div>
                             <div className="sub-row-meta">
                               <span className="pill neutral">{CYCLE_LABEL[s.billing_cycle]}</span>
@@ -198,7 +199,7 @@ export default function Subscriptions() {
                       <td className="num">{fmtLKR(s.amount)}</td>
                       <td className="num">{fmtLKR(subscriptionMonthlyCost(s))}</td>
                       <td>{fmtDate(s.next_renewal_date)}</td>
-                      <td><span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[s.owner]}</span></td>
+                      <td><span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{s.owner === 'business' && s.business ? BUSINESS_LABEL[s.business] : OWNER_LABEL[s.owner]}</span></td>
                       <td><span className={`pill ${s.status === 'active' ? 'good' : 'neutral'}`}>{s.status}</span></td>
                       <td>{s.zoho_account_id ? <span className="pill good" title={s.zoho_account_name ?? undefined}>Linked</span> : <span className="pill neutral">Not yet</span>}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -245,12 +246,28 @@ export default function Subscriptions() {
             </div>
             <div className="field">
               <label>Owner</label>
-              <select value={editing.owner ?? 'personal'} onChange={(e) => setEditing({ ...editing, owner: e.target.value as Owner })}>
+              <select
+                value={editing.owner ?? 'personal'}
+                onChange={(e) => {
+                  const owner = e.target.value as Owner
+                  setEditing({ ...editing, owner, business: owner === 'business' ? (editing.business ?? 'nexxel') : null })
+                }}
+              >
                 <option value="personal">Personal</option>
                 <option value="business">Business</option>
               </select>
             </div>
           </div>
+          {editing.owner === 'business' && (
+            <div className="field-row">
+              <div className="field">
+                <label>Which business</label>
+                <select value={editing.business ?? 'nexxel'} onChange={(e) => setEditing({ ...editing, business: e.target.value as Subscription['business'] })}>
+                  {BUSINESSES.map((b) => <option key={b} value={b}>{BUSINESS_LABEL[b]}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="field-row">
             <div className="field">
               <label>Category (optional)</label>

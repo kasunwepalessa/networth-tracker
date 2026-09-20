@@ -4,11 +4,12 @@ import { transactionsApi } from '../lib/api'
 import Modal from '../components/Modal'
 import { fmtLKR, fmtDate, todayISO, OWNER_LABEL } from '../lib/format'
 import { inRange } from '../lib/calc'
+import { BUSINESS_LABEL, BUSINESSES } from '../lib/businessCalc'
 import PeriodFilterBar, { usePeriodFilter } from '../components/PeriodFilter'
 import type { Transaction, Owner } from '../lib/types'
 
 const empty: Partial<Transaction> = {
-  txn_date: todayISO(), amount: 0, description: '', owner: 'personal',
+  txn_date: todayISO(), amount: 0, description: '', owner: 'personal', business: null,
   account_id: null, category_id: null, client_id: null, is_recurring: false, recurring_frequency: null,
 }
 
@@ -146,7 +147,11 @@ export default function Transactions() {
                       </td>
                       <td>{catName(t.category_id)}</td>
                       <td>{accName(t.account_id)}</td>
-                      <td><span className={`pill ${t.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[t.owner]}</span></td>
+                      <td>
+                        <span className={`pill ${t.owner === 'business' ? 'brand' : 'accent'}`}>
+                          {t.owner === 'business' && t.business ? BUSINESS_LABEL[t.business] : OWNER_LABEL[t.owner]}
+                        </span>
+                      </td>
                       <td className="num" style={{ color: t.amount >= 0 ? 'var(--good)' : 'var(--critical)' }}>{fmtLKR(t.amount, { sign: true })}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn sm" onClick={() => openEdit(t)}>Edit</button>{' '}
@@ -205,21 +210,37 @@ export default function Transactions() {
           <div className="field-row">
             <div className="field">
               <label>Owner (personal / business split)</label>
-              <select value={editing.owner ?? 'personal'} onChange={(e) => setEditing({ ...editing, owner: e.target.value as Owner })}>
+              <select
+                value={editing.owner ?? 'personal'}
+                onChange={(e) => {
+                  const owner = e.target.value as Owner
+                  setEditing({ ...editing, owner, business: owner === 'business' ? (editing.business ?? 'nexxel') : null })
+                }}
+              >
                 <option value="personal">Personal</option>
                 <option value="business">Business</option>
               </select>
             </div>
             {editing.owner === 'business' && (
               <div className="field">
-                <label>Client (optional)</label>
-                <select value={editing.client_id ?? ''} onChange={(e) => setEditing({ ...editing, client_id: e.target.value || null })}>
-                  <option value="">No client</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <label>Which business</label>
+                <select value={editing.business ?? 'nexxel'} onChange={(e) => setEditing({ ...editing, business: e.target.value as Transaction['business'] })}>
+                  {BUSINESSES.map((b) => <option key={b} value={b}>{BUSINESS_LABEL[b]}</option>)}
                 </select>
               </div>
             )}
           </div>
+          {editing.owner === 'business' && (
+            <div className="field-row">
+              <div className="field">
+                <label>Client (optional)</label>
+                <select value={editing.client_id ?? ''} onChange={(e) => setEditing({ ...editing, client_id: e.target.value || null })}>
+                  <option value="">No client</option>
+                  {clients.filter((c) => c.business === editing.business).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="field-row" style={{ alignItems: 'center' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>
               <input type="checkbox" checked={!!editing.is_recurring} onChange={(e) => setEditing({ ...editing, is_recurring: e.target.checked })} style={{ width: 'auto' }} />

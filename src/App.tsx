@@ -10,6 +10,7 @@ import Portfolio from './pages/Portfolio'
 import Budgets from './pages/Budgets'
 import Forecast from './pages/Forecast'
 import Invoices from './pages/Invoices'
+import Businesses from './pages/Businesses'
 import Goals from './pages/Goals'
 import Subscriptions from './pages/Subscriptions'
 import NetWorthDetail from './pages/overview/NetWorthDetail'
@@ -33,6 +34,7 @@ function Gate() {
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/forecast" element={<Forecast />} />
             <Route path="/invoices" element={<Invoices />} />
+            <Route path="/businesses" element={<Businesses />} />
             <Route path="/goals" element={<Goals />} />
             <Route path="/subscriptions" element={<Subscriptions />} />
             <Route path="/overview/net-worth" element={<NetWorthDetail />} />
