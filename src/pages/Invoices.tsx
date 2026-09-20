@@ -281,45 +281,6 @@ export default function Invoices() {
 
       <section className="card" style={{ marginBottom: 16 }}>
         <div className="card-pad">
-          <div className="tabs" style={{ marginBottom: 14 }}>
-            <button className={categoryFilter === 'all' ? 'active' : ''} onClick={() => setCategoryFilter('all')}>All &middot; {invoices.length}</button>
-            {CATEGORY_ORDER.map((c) => (
-              <button key={c} className={categoryFilter === c ? 'active' : ''} onClick={() => setCategoryFilter(c)}>{CATEGORY_LABEL[c]} &middot; {categoryCounts[c]}</button>
-            ))}
-          </div>
-          {loading ? <div className="empty">Loading…</div> : filteredInvoices.length === 0 ? (
-            <div className="empty">{invoices.length === 0 ? 'No invoices yet.' : `No ${CATEGORY_LABEL[categoryFilter as InvoiceCategory]?.toLowerCase() ?? ''} invoices.`}</div>
-          ) : (
-            <div className="table-scroll"><table>
-              <thead><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th>Zoho</th><th></th></tr></thead>
-              <tbody>
-                {filteredInvoices.map((i) => (
-                  <tr key={i.id}>
-                    <td>{i.invoice_number || i.id.slice(0, 8)}</td>
-                    <td>{clientName(i.client_id)}</td>
-                    <td><span className={`pill ${categoryPillClass(i)}`}>{CATEGORY_LABEL[CATEGORY_OF[i.status]]}{i.status === 'overdue' ? ' · overdue' : ''}</span></td>
-                    <td className="num">{fmtLKR(i.amount)}</td>
-                    <td className="num" style={{ color: i.balance > 0 ? 'var(--critical)' : undefined }}>{fmtLKR(i.balance)}</td>
-                    <td>{fmtDate(i.due_date)}</td>
-                    <td>
-                      {i.zoho_invoice_id ? (
-                        <a className="pill good" style={{ textDecoration: 'none' }} href={`https://invoice.zoho.com/app/${ZOHO_ORG_ID}#/invoices/${i.zoho_invoice_id}`} target="_blank" rel="noreferrer">Linked</a>
-                      ) : <span className="pill neutral">Not yet</span>}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button className="btn sm" onClick={() => setEditing(i)}>Edit</button>{' '}
-                      <button className="btn sm danger" onClick={() => remove(i.id)}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          )}
-        </div>
-      </section>
-
-      <section className="card" style={{ marginBottom: 16 }}>
-        <div className="card-pad">
           <div className="section-head">
             <h3>Work log &middot; push to Zoho</h3>
             <button className="btn sm" onClick={syncFromZoho} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync customers from Zoho'}</button>
@@ -410,6 +371,46 @@ export default function Invoices() {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="card" style={{ marginBottom: 16 }}>
+        <div className="card-pad">
+          <div className="section-head"><h3>All invoices</h3><span className="hint">Scroll to see more — {filteredInvoices.length} shown</span></div>
+          <div className="tabs" style={{ marginBottom: 14 }}>
+            <button className={categoryFilter === 'all' ? 'active' : ''} onClick={() => setCategoryFilter('all')}>All &middot; {invoices.length}</button>
+            {CATEGORY_ORDER.map((c) => (
+              <button key={c} className={categoryFilter === c ? 'active' : ''} onClick={() => setCategoryFilter(c)}>{CATEGORY_LABEL[c]} &middot; {categoryCounts[c]}</button>
+            ))}
+          </div>
+          {loading ? <div className="empty">Loading…</div> : filteredInvoices.length === 0 ? (
+            <div className="empty">{invoices.length === 0 ? 'No invoices yet.' : `No ${CATEGORY_LABEL[categoryFilter as InvoiceCategory]?.toLowerCase() ?? ''} invoices.`}</div>
+          ) : (
+            <div className="table-scroll" style={{ maxHeight: 480, overflowY: 'auto' }}><table>
+              <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th>Zoho</th><th></th></tr></thead>
+              <tbody>
+                {filteredInvoices.map((i) => (
+                  <tr key={i.id}>
+                    <td>{i.invoice_number || i.id.slice(0, 8)}</td>
+                    <td>{clientName(i.client_id)}</td>
+                    <td><span className={`pill ${categoryPillClass(i)}`}>{CATEGORY_LABEL[CATEGORY_OF[i.status]]}{i.status === 'overdue' ? ' · overdue' : ''}</span></td>
+                    <td className="num">{fmtLKR(i.amount)}</td>
+                    <td className="num" style={{ color: i.balance > 0 ? 'var(--critical)' : undefined }}>{fmtLKR(i.balance)}</td>
+                    <td>{fmtDate(i.due_date)}</td>
+                    <td>
+                      {i.zoho_invoice_id ? (
+                        <a className="pill good" style={{ textDecoration: 'none' }} href={`https://invoice.zoho.com/app/${ZOHO_ORG_ID}#/invoices/${i.zoho_invoice_id}`} target="_blank" rel="noreferrer">Linked</a>
+                      ) : <span className="pill neutral">Not yet</span>}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn sm" onClick={() => setEditing(i)}>Edit</button>{' '}
+                      <button className="btn sm danger" onClick={() => remove(i.id)}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
           )}
         </div>
       </section>
