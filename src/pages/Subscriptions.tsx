@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/useData'
-import { subscriptionsApi, logSubscriptionPayment, zohoApi } from '../lib/api'
+import { subscriptionsApi, logSubscriptionPayment } from '../lib/api'
 import { totalMonthlySubscriptionCost, totalYearlySubscriptionCost, upcomingSubscriptions, subscriptionMonthlyCost } from '../lib/calc'
 import { fmtLKR, fmtDate, todayISO, daysUntil, OWNER_LABEL } from '../lib/format'
 import { useCountUp } from '../lib/useCountUp'
 import Modal from '../components/Modal'
-import type { Subscription, Owner, BillingCycle, Category } from '../lib/types'
+import type { Subscription, Owner, BillingCycle } from '../lib/types'
 
 const CYCLE_LABEL: Record<BillingCycle, string> = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' }
 const AVATAR_COLORS = ['var(--brand)', 'var(--accent)', 'var(--cat-1)', 'var(--cat-5)', 'var(--cat-7)', 'var(--cat-2)']
@@ -44,7 +44,6 @@ export default function Subscriptions() {
   const [saving, setSaving] = useState(false)
   const [loggingId, setLoggingId] = useState<string | null>(null)
   const [showCancelled, setShowCancelled] = useState(false)
-  const [connectingCatId, setConnectingCatId] = useState<string | null>(null)
 
   const monthlyCost = totalMonthlySubscriptionCost(subscriptions)
   const yearlyCost = totalYearlySubscriptionCost(subscriptions)
@@ -99,26 +98,6 @@ export default function Subscriptions() {
     }
   }
 
-  // Subscription categories not yet linked to a Zoho expense category — surfaced so the
-  // person can connect them once, after which every future "Log payment" for a subscription
-  // in that category is mirrored into Zoho Invoice's Expenses automatically.
-  const unlinkedSubCategories = useMemo(() => {
-    const usedIds = new Set(subscriptions.map((s) => s.category_id).filter((id): id is string => !!id))
-    return categories.filter((c) => usedIds.has(c.id) && !c.zoho_account_id)
-  }, [subscriptions, categories])
-
-  async function connectCategoryToZoho(cat: Category) {
-    setConnectingCatId(cat.id)
-    try {
-      await zohoApi.ensureExpenseCategory(cat.id, cat.name)
-      await refresh('categories')
-    } catch (e) {
-      alert(`Couldn't link "${cat.name}" to Zoho: ${(e as Error).message}`)
-    } finally {
-      setConnectingCatId(null)
-    }
-  }
-
   const accName = (id: string | null) => accounts.find((a) => a.id === id)?.name
 
   return (
@@ -130,22 +109,6 @@ export default function Subscriptions() {
         </div>
         <button className="btn primary pill" onClick={openNew}>+ Add subscription</button>
       </div>
-
-      {unlinkedSubCategories.length > 0 && (
-        <div className="alert warning rise" style={{ marginBottom: 14, alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>
-            {unlinkedSubCategories.map((c) => `"${c.name}"`).join(', ')} {unlinkedSubCategories.length === 1 ? 'isn\'t' : 'aren\'t'} linked to Zoho Invoice yet —
-            connect it once and every "Log payment" from a subscription in that category will sync to Zoho Invoice as an expense automatically.
-          </span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 'none' }}>
-            {unlinkedSubCategories.map((c) => (
-              <button key={c.id} className="btn sm pill" disabled={connectingCatId === c.id} onClick={() => connectCategoryToZoho(c)}>
-                {connectingCatId === c.id ? 'Connecting…' : `Connect "${c.name}"`}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="grid cols-3 rise rise-1" style={{ marginBottom: 14 }}>
         <div className="card card-pad kpi">
@@ -226,7 +189,7 @@ export default function Subscriptions() {
           {loading ? <div className="empty">Loading…</div> : (
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Name</th><th>Cycle</th><th className="num">Amount</th><th className="num">Monthly equiv.</th><th>Next renewal</th><th>Owner</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Name</th><th>Cycle</th><th className="num">Amount</th><th className="num">Monthly equiv.</th><th>Next renewal</th><th>Owner</th><th>Status</th><th>Zoho</th><th></th></tr></thead>
                 <tbody>
                   {subscriptions.filter((s) => showCancelled || s.status === 'active').map((s) => (
                     <tr key={s.id}>
@@ -237,6 +200,7 @@ export default function Subscriptions() {
                       <td>{fmtDate(s.next_renewal_date)}</td>
                       <td><span className={`pill ${s.owner === 'business' ? 'brand' : 'accent'}`}>{OWNER_LABEL[s.owner]}</span></td>
                       <td><span className={`pill ${s.status === 'active' ? 'good' : 'neutral'}`}>{s.status}</span></td>
+                      <td>{s.zoho_account_id ? <span className="pill good" title={s.zoho_account_name ?? undefined}>Linked</span> : <span className="pill neutral">Not yet</span>}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="btn sm" onClick={() => openEdit(s)}>Edit</button>{' '}
                         <button className="btn sm" onClick={() => toggleStatus(s)}>{s.status === 'active' ? 'Cancel' : 'Reactivate'}</button>{' '}

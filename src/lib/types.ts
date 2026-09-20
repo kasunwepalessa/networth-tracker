@@ -191,6 +191,8 @@ export interface Subscription {
   account_id: string | null
   status: 'active' | 'cancelled'
   notes: string | null
+  zoho_account_id: string | null
+  zoho_account_name: string | null
   created_at: string
 }
 
