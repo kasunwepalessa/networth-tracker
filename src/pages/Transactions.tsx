@@ -88,7 +88,7 @@ export default function Transactions() {
 
       <PeriodFilterBar pf={pf} />
 
-      <div className="grid cols-3" style={{ marginBottom: 14 }}>
+      <div className="grid cols-3 kpi-grid" style={{ marginBottom: 14 }}>
         <div className="card card-pad kpi">
           <span className="label">Income {periodType !== 'all' ? `· ${title}` : ''}</span>
           <span className="value num" style={{ color: 'var(--good)' }}>{fmtLKR(periodIncome)}</span>
@@ -131,7 +131,8 @@ export default function Transactions() {
           {loading ? <div className="empty">Loading…</div> : filtered.length === 0 ? (
             <div className="empty">No transactions match. Add one, or clear your filters.</div>
           ) : (
-            <div className="table-scroll">
+            <>
+            <div className="table-scroll desktop-table">
               <table>
                 <thead>
                   <tr><th>Date</th><th>Description</th><th>Category</th><th>Account</th><th>Owner</th><th className="num">Amount</th><th></th></tr>
@@ -162,6 +163,31 @@ export default function Transactions() {
                 </tbody>
               </table>
             </div>
+
+            <div className="mobile-cards">
+              {filtered.map((t) => (
+                <div key={t.id} className="row-card">
+                  <div className="row-card-top">
+                    <span className="row-card-title">{t.description || '—'}</span>
+                    <span className="row-card-amount" style={{ color: t.amount >= 0 ? 'var(--good)' : 'var(--critical)' }}>{fmtLKR(t.amount, { sign: true })}</span>
+                  </div>
+                  <div className="row-card-sub">{catName(t.category_id)} &middot; {accName(t.account_id)}{clientName(t.client_id) ? ` · ${clientName(t.client_id)}` : ''}</div>
+                  <div className="row-card-meta">
+                    <span>{fmtDate(t.txn_date)}</span>
+                    <span className="dot">&middot;</span>
+                    <span className={`pill ${t.owner === 'business' ? 'brand' : 'accent'}`}>
+                      {t.owner === 'business' && t.business ? BUSINESS_LABEL[t.business] : OWNER_LABEL[t.owner]}
+                    </span>
+                    {t.zoho_expense_id ? <span className="pill good">Synced to Zoho</span> : null}
+                  </div>
+                  <div className="row-card-actions">
+                    <button className="btn sm" style={{ flex: 1 }} onClick={() => openEdit(t)}>Edit</button>
+                    <button className="btn sm danger" style={{ flex: 1 }} onClick={() => remove(t.id)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </section>

@@ -45,7 +45,7 @@ export default function Accounts() {
         <button className="btn primary" onClick={() => setEditing(empty)}>+ Add account</button>
       </div>
 
-      <div className="grid cols-3" style={{ marginBottom: 16 }}>
+      <div className="grid cols-3 kpi-grid" style={{ marginBottom: 16 }}>
         <div className="card card-pad kpi">
           <span className="label">Personal cash</span>
           <span className="value num">{fmtLKR(totalByOwner('personal'))}</span>

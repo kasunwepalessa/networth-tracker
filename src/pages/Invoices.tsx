@@ -268,7 +268,7 @@ export default function Invoices() {
         </div>
       </div>
 
-      <div className="grid cols-5" style={{ marginBottom: 16 }}>
+      <div className="grid cols-5 kpi-grid" style={{ marginBottom: 16 }}>
         <div className="card card-pad kpi"><span className="label">Outstanding</span><span className="value num" style={{ color: 'var(--critical)' }}>{fmtLKR(outstanding)}</span></div>
         <div className="card card-pad kpi">
           <span className="label">Sent &middot; awaiting payment</span>
@@ -317,9 +317,9 @@ export default function Invoices() {
             </div>
             <button className="btn primary" onClick={addWorkEntry} disabled={addingWork || !workClientId || !workDesc.trim()}>+ Add</button>
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-            <input value={newCustName} onChange={(e) => setNewCustName(e.target.value)} placeholder="New customer name…" style={{ flex: 1, maxWidth: 220 }} />
-            <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email (optional)" style={{ flex: 1, maxWidth: 220 }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+            <input value={newCustName} onChange={(e) => setNewCustName(e.target.value)} placeholder="New customer name…" style={{ flex: '1 1 180px', maxWidth: 220 }} />
+            <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email (optional)" style={{ flex: '1 1 180px', maxWidth: 220 }} />
             <button className="btn sm" type="button" onClick={addCustomerFromWorkLog} disabled={addingCustomer || !newCustName.trim()}>Add customer (syncs to Zoho)</button>
           </div>
 
@@ -388,7 +388,8 @@ export default function Invoices() {
           {loading ? <div className="empty">Loading…</div> : filteredInvoices.length === 0 ? (
             <div className="empty">{invoices.length === 0 ? 'No invoices yet.' : `No ${CATEGORY_LABEL[categoryFilter as InvoiceCategory]?.toLowerCase() ?? ''} invoices.`}</div>
           ) : (
-            <div className="table-scroll" style={{ maxHeight: 480, overflowY: 'auto' }}><table>
+            <>
+            <div className="table-scroll desktop-table" style={{ maxHeight: 480, overflowY: 'auto' }}><table>
               <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}><tr><th>Invoice</th><th>Client</th><th>Status</th><th className="num">Amount</th><th className="num">Balance</th><th>Due</th><th>Zoho</th><th></th></tr></thead>
               <tbody>
                 {filteredInvoices.map((i) => (
@@ -412,6 +413,31 @@ export default function Invoices() {
                 ))}
               </tbody>
             </table></div>
+
+            <div className="mobile-cards" style={{ maxHeight: 520, overflowY: 'auto' }}>
+              {filteredInvoices.map((i) => (
+                <div key={i.id} className="row-card">
+                  <div className="row-card-top">
+                    <span className="row-card-title">{i.invoice_number || i.id.slice(0, 8)}</span>
+                    <span className="row-card-amount" style={{ color: i.balance > 0 ? 'var(--critical)' : undefined }}>{fmtLKR(i.balance > 0 ? i.balance : i.amount)}</span>
+                  </div>
+                  <div className="row-card-sub">{clientName(i.client_id)}</div>
+                  <div className="row-card-meta">
+                    <span className={`pill ${categoryPillClass(i)}`}>{CATEGORY_LABEL[CATEGORY_OF[i.status]]}{i.status === 'overdue' ? ' · overdue' : ''}</span>
+                    <span className="dot">&middot;</span>
+                    <span>Due {fmtDate(i.due_date)}</span>
+                    {i.zoho_invoice_id ? (
+                      <a href={`https://invoice.zoho.com/app/${ZOHO_ORG_ID}#/invoices/${i.zoho_invoice_id}`} target="_blank" rel="noreferrer">Zoho &rarr;</a>
+                    ) : <span>Not on Zoho</span>}
+                  </div>
+                  <div className="row-card-actions">
+                    <button className="btn sm" style={{ flex: 1 }} onClick={() => setEditing(i)}>Edit</button>
+                    <button className="btn sm danger" style={{ flex: 1 }} onClick={() => remove(i.id)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </section>

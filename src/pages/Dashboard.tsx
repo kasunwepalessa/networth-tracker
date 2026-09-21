@@ -286,7 +286,7 @@ export default function Dashboard() {
         <PeriodFilterBar pf={pf} bare />
       </div>
 
-      <div className="grid cols-3 rise rise-1" style={{ marginBottom: 14 }}>
+      <div className="grid cols-3 kpi-grid rise rise-1" style={{ marginBottom: 14 }}>
         <div className="card card-pad kpi hoverable clickable" onClick={() => navigate('/overview/net-worth')}>
           <div className="kpi-top">
             <span className="label">Net worth</span>
@@ -321,7 +321,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid cols-4 rise rise-2" style={{ marginBottom: 14 }}>
+      <div className="grid cols-4 kpi-grid rise rise-2" style={{ marginBottom: 14 }}>
         <div className="card card-pad kpi hoverable clickable" onClick={() => navigate('/overview/cash-flow')}>
           <div className="kpi-top">
             <span className="label">Income{periodSuffix}</span>
@@ -354,7 +354,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid cols-2 rise rise-3" style={{ alignItems: 'stretch', gridTemplateColumns: '1.4fr 1fr', marginBottom: 14 }}>
+      <div className="grid cols-2 hero-row rise rise-3" style={{ alignItems: 'stretch', marginBottom: 14 }}>
         <section className="card hoverable">
           <div className="card-pad balance-card">
             <div className="section-head">

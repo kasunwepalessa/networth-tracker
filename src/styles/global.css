@@ -218,8 +218,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 }
 .sidebar a.navlink:hover { background: var(--surface-2); color: var(--ink-1); }
 .sidebar a.navlink.active { background: var(--brand-soft); color: var(--brand); }
-.sidebar .signout { margin-top: auto; padding: 9px 10px; font-size: 12.5px; color: var(--ink-muted); background: none; border: none; text-align: left; cursor: pointer; border-radius: 9px; }
-.sidebar .signout:hover { background: var(--surface-2); color: var(--ink-1); }
+.signout { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 10px; font-size: 12.5px; font-weight: 700; font-family: inherit; color: var(--ink-muted); background: none; border: none; cursor: pointer; border-radius: 9px; }
+.signout svg { width: 16px; height: 16px; }
+.signout:hover { background: var(--surface-2); color: var(--ink-1); }
+.sidebar .signout { margin-top: auto; font-weight: 400; justify-content: flex-start; }
+.more-sheet-foot .signout { background: var(--surface-2); min-height: 44px; }
 
 .mobile-topbar { display: none; }
 
@@ -244,6 +247,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
 .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+/* A grid item's automatic min-width is "auto" by default, which means it won't shrink below
+   its content's intrinsic (min-content) size — a wide table or chart inside a grid cell then
+   forces the whole grid, and the page, wider than the viewport. This is the single most common
+   cause of horizontal overflow on narrow screens, so every grid item opts out of it here. */
+.grid > * { min-width: 0; }
+
+/* Asymmetric two-up hero row (e.g. Dashboard's chart + side card) — a dedicated class instead
+   of an inline gridTemplateColumns so the mobile breakpoint below can still collapse it. */
+.grid.hero-row { grid-template-columns: 1.4fr 1fr; }
 
 .kpi { display: flex; flex-direction: column; gap: 6px; }
 .kpi .label { font-size: 11px; color: var(--ink-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -259,8 +271,20 @@ tbody td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align
 tbody td.num { text-align: right; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--surface-2); }
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll table { min-width: 640px; }
+
+/* --- Row cards: the mobile stand-in for a data table (see .desktop-table / .mobile-cards) --- */
+.mobile-cards { display: none; }
+.row-card { padding: 13px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.row-card + .row-card { margin-top: 8px; }
+.row-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row-card-title { font-weight: 700; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-card-amount { font-weight: 800; font-family: 'Sora', sans-serif; font-size: 14px; flex: none; }
+.row-card-sub { font-size: 12px; color: var(--ink-2); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; color: var(--ink-muted); }
+.row-card-meta .dot { opacity: 0.5; }
+.row-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .pill.good { background: var(--good-soft); color: var(--good); }
@@ -477,6 +501,48 @@ tbody tr:hover { background: var(--surface-2); }
 .hero-stat .hero-value { font-size: 40px; font-weight: 800; font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
 .hero-stat .hero-label { font-size: 12.5px; color: var(--ink-muted); margin-top: 4px; }
 
+/* --- Bottom tab bar (mobile primary nav) --- */
+.bottom-tabbar {
+  display: none;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 35;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -2px 16px -8px rgba(21,23,29,0.14);
+}
+.bottom-tabbar-row { display: flex; align-items: stretch; justify-content: space-between; }
+.bottom-tabbar a, .bottom-tabbar button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 7px 2px 6px; border-radius: 10px; text-decoration: none; border: none; background: none;
+  color: var(--ink-muted); font-size: 10.5px; font-weight: 700; font-family: inherit; cursor: pointer;
+  min-height: 52px;
+}
+.bottom-tabbar a svg, .bottom-tabbar button svg { width: 20px; height: 20px; }
+.bottom-tabbar a.active, .bottom-tabbar button.active { color: var(--brand); }
+.bottom-tabbar a:active, .bottom-tabbar button:active { background: var(--surface-2); }
+
+.more-sheet-backdrop {
+  position: fixed; inset: 0; background: rgba(10,11,14,0.45); z-index: 40;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.more-sheet {
+  background: var(--surface); width: 100%; max-width: 520px;
+  border-radius: 20px 20px 0 0; border: 1px solid var(--border); border-bottom: none;
+  padding: 10px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+  max-height: 78vh; overflow-y: auto;
+  animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.more-sheet-grabber { width: 36px; height: 4px; border-radius: 999px; background: var(--border-strong); margin: 6px auto 12px; }
+.more-sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 6px; }
+.more-sheet-grid a, .more-sheet-grid button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  padding: 16px 8px; border-radius: 14px; background: var(--surface-2); border: none;
+  color: var(--ink-1); text-decoration: none; font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
+  text-align: center;
+}
+.more-sheet-grid a.active { background: var(--brand-soft); color: var(--brand); }
+.more-sheet-grid svg { width: 20px; height: 20px; }
+.more-sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 6px 4px; padding-top: 12px; border-top: 1px solid var(--border); }
+
 @media (max-width: 900px) {
   .grid.cols-5 { grid-template-columns: repeat(3, 1fr); }
   .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
@@ -485,15 +551,44 @@ tbody tr:hover { background: var(--surface-2); }
   .sidebar { display: none; }
   .mobile-topbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; background: var(--surface); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 30;
   }
   .mobile-topbar h1 { font-size: 15px; margin: 0; font-weight: 800; }
-  .mobile-nav { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 29; }
-  .mobile-nav a { flex: none; padding: 6px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ink-2); text-decoration: none; background: var(--surface-2); }
-  .mobile-nav a.active { background: var(--brand); color: #fff; }
-  .content { padding: 18px 14px 48px; }
+  .content { padding: 16px 14px calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .bottom-tabbar { display: block; }
+
+  /* KPI tiles stay two-up on mobile (scanning several short stats beats a long single-column
+     scroll); heavier content grids (charts, tables, forms) still collapse to one column below. */
+  .grid.kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+  .grid.kpi-grid .card-pad { padding: 13px 14px; }
+  .grid.kpi-grid .kpi .value { font-size: 18px; }
+  .grid.kpi-grid .kpi .value.lg { font-size: 20px; }
+  .grid.kpi-grid .kpi .label { font-size: 10px; }
+  .grid.kpi-grid .kpi .sub { font-size: 11px; }
+
+  .grid.hero-row { grid-template-columns: 1fr; }
+
+  /* Row-card tables: show the compact card list, hide the horizontal-scroll table. */
+  .desktop-table { display: none; }
+  .mobile-cards { display: flex; flex-direction: column; }
+
+  .card-pad { padding: 15px 16px; }
+  .page-head h2 { font-size: 19px; }
+  .btn { padding: 10px 15px; min-height: 40px; }
+  .btn.sm { padding: 8px 11px; min-height: 34px; }
+  .field input, .field select, .field textarea { padding: 11px 12px; font-size: 14.5px; }
+  table { font-size: 12.5px; }
+
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal { max-width: none; width: 100%; border-radius: 18px 18px 0 0; max-height: 92vh; }
 }
 @media (max-width: 520px) {
   .grid.cols-5, .grid.cols-4, .grid.cols-3, .grid.cols-2 { grid-template-columns: 1fr; }
+  .grid.kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  /* A long category/account name never fits a fixed 108px column on a phone — let it take its
+     own full-width line above the bar instead of being clipped to an unreadable ellipsis. */
+  .hbar-row { flex-wrap: wrap; row-gap: 4px; }
+  .hbar-label { flex: 1 1 100%; width: auto !important; white-space: normal; overflow: visible; text-overflow: clip; }
+  .hbar-val { margin-left: auto; }
 }
